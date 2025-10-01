@@ -1,0 +1,5 @@
+{
+  "name": "AI Game Master",
+  "description": "A single-player, text-based RPG where an AI, powered by Gemini, acts as the Game Master. Players create a character based on D&D 5e rules and interact with a dynamic, AI-generated world through text commands to embark on a unique adventure.",
+  "requestFramePermissions": []
+}
