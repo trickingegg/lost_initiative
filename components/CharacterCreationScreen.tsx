@@ -6,19 +6,18 @@ import {
     INITIAL_CHARACTER, 
     BACKGROUNDS_DATA,
     STANDARD_ABILITY_SCORES,
-    WIZARD_SPELLS
+    WIZARD_SPELLS,
+    NECROMANCER_SPELLS
 } from '../constants';
 import { calculateBaseAC, calculateMaxHp, getModifierString, calculateModifier } from '../utils/dnd';
 
 interface CharacterCreationScreenProps {
     onStartGame: (character: Character) => void;
-    onLoadGame: () => void;
-    onNewGame: () => void;
 }
 
-const CharacterCreationScreen: React.FC<CharacterCreationScreenProps> = ({ onStartGame, onLoadGame }) => {
+const CharacterCreationScreen: React.FC<CharacterCreationScreenProps> = ({ onStartGame }) => {
     const [name, setName] = useState('');
-    const [charClass, setCharClass] = useState(Class.Fighter);
+    const [charClass, setCharClass] = useState<Class>(Class.Fighter);
     const [race, setRace] = useState(Race.Human);
     const [background, setBackground] = useState(Background.Acolyte);
     const [level, setLevel] = useState(1);
@@ -26,6 +25,16 @@ const CharacterCreationScreen: React.FC<CharacterCreationScreenProps> = ({ onSta
     const [equipmentSelections, setEquipmentSelections] = useState<Record<string, string | Item>>({});
     const [selectedClassSkills, setSelectedClassSkills] = useState<Skill[]>([]);
     const [selectedSpells, setSelectedSpells] = useState<Record<'cantrips' | 'level1', Spell[]>>({ cantrips: [], level1: [] });
+    
+    // ASI State
+    const [asiPoints, setAsiPoints] = useState(0);
+    const [appliedAsi, setAppliedAsi] = useState<Partial<Record<Ability, number>>>({});
+
+    // Custom Class State
+    const [customClassDescription, setCustomClassDescription] = useState('');
+    const [primaryAbility, setPrimaryAbility] = useState<Ability>(Ability.Strength);
+    const [secondaryAbility, setSecondaryAbility] = useState<Ability>(Ability.Dexterity);
+
 
     const unassignedScores = useMemo(() => {
         const assigned = Object.values(abilityScores);
@@ -53,7 +62,23 @@ const CharacterCreationScreen: React.FC<CharacterCreationScreenProps> = ({ onSta
         setSelectedClassSkills([]);
         // Reset spells
         setSelectedSpells({ cantrips: [], level1: [] });
+
+        if (charClass !== Class.Custom) {
+            setCustomClassDescription('');
+        }
+
     }, [charClass, background]);
+
+    // Update available ASI points when level or applied points change
+    useEffect(() => {
+        const totalPointsFromLevel = level >= 4 ? 2 : 0;
+        if (totalPointsFromLevel === 0 && Object.keys(appliedAsi).length > 0) {
+            setAppliedAsi({});
+        }
+        // FIX: Ensure undefined values are handled in reduce to prevent type errors.
+        const pointsSpent = Object.values(appliedAsi).reduce((sum, val) => sum + (val || 0), 0);
+        setAsiPoints(totalPointsFromLevel - pointsSpent);
+    }, [level, appliedAsi]);
 
     const handleAbilityChange = (ability: Ability, value: string) => {
         const newScore = parseInt(value);
@@ -73,16 +98,23 @@ const CharacterCreationScreen: React.FC<CharacterCreationScreenProps> = ({ onSta
     };
     
     const finalAbilities = useMemo(() => {
-        const final: Record<Ability, number> = { ...abilityScores };
+        const withAsi: Record<Ability, number> = { ...abilityScores };
+        for (const [ability, points] of Object.entries(appliedAsi)) {
+            // FIX: Use a more robust type check to ensure `points` is a number before performing addition.
+            if (typeof points === 'number') {
+                withAsi[ability as Ability] += points;
+            }
+        }
+
+        const final: Record<Ability, number> = withAsi;
         const bonuses = RACES_DATA[race].abilityBonuses || {};
         for (const [ability, bonus] of Object.entries(bonuses)) {
-            // FIX: Add a type guard to ensure bonus is a number before performing addition.
             if (typeof bonus === 'number') {
                 final[ability as Ability] += bonus;
             }
         }
         return final;
-    }, [abilityScores, race]);
+    }, [abilityScores, race, appliedAsi]);
 
     const createdCharacter = useMemo((): Omit<Character, 'inventory' | 'gold' | 'skills' | 'spells'> => {
         const maxHp = calculateMaxHp(level, charClass, finalAbilities[Ability.Constitution]);
@@ -102,14 +134,17 @@ const CharacterCreationScreen: React.FC<CharacterCreationScreenProps> = ({ onSta
     }, [name, race, charClass, background, level, finalAbilities]);
 
     const handleSuggestStats = useCallback(() => {
-        const priority = CLASSES_DATA[charClass].abilityPriority;
+        const priority = charClass === Class.Custom
+            ? [primaryAbility, secondaryAbility, ...Object.values(Ability).filter(a => a !== primaryAbility && a !== secondaryAbility)]
+            : CLASSES_DATA[charClass].abilityPriority;
+            
         const scores = [...STANDARD_ABILITY_SCORES].sort((a, b) => b - a);
         const newScores: Record<Ability, number> = {} as Record<Ability, number>;
         priority.forEach((ability, index) => {
             newScores[ability] = scores[index];
         });
         setAbilityScores(newScores);
-    }, [charClass]);
+    }, [charClass, primaryAbility, secondaryAbility]);
 
     const backgroundSkills = useMemo(() => BACKGROUNDS_DATA[background].skillProficiencies, [background]);
     const classSkillData = useMemo(() => CLASSES_DATA[charClass].skillChoices, [charClass]);
@@ -126,9 +161,28 @@ const CharacterCreationScreen: React.FC<CharacterCreationScreenProps> = ({ onSta
             }
         });
     };
+    
+    const handleAsiChange = (ability: Ability, amount: number) => {
+        const currentAsi = appliedAsi[ability] || 0;
+        const baseScore = abilityScores[ability];
+
+        if (amount > 0) { // Adding a point
+            if (asiPoints > 0 && (baseScore + currentAsi + 1) <= 20 && (currentAsi + 1) <= 2) {
+                setAppliedAsi(prev => ({ ...prev, [ability]: currentAsi + 1 }));
+            }
+        } else { // Removing a point
+            if (currentAsi > 0) {
+                 setAppliedAsi(prev => ({ ...prev, [ability]: currentAsi - 1 }));
+            }
+        }
+    };
 
     const handleSpellChange = (spell: Spell, type: 'cantrips' | 'level1', checked: boolean) => {
-        const limit = CLASSES_DATA[Class.Wizard].spellChoices?.[type] ?? 0;
+        const spellcastingClassData = CLASSES_DATA[charClass];
+        if (!spellcastingClassData.spellChoices) return;
+        
+        const limit = spellcastingClassData.spellChoices[type] ?? 0;
+
         setSelectedSpells(prev => {
             const currentList = prev[type];
             if (checked) {
@@ -152,12 +206,26 @@ const CharacterCreationScreen: React.FC<CharacterCreationScreenProps> = ({ onSta
              alert('Please assign all ability scores from the standard array.');
              return;
         }
+        if (asiPoints > 0) {
+            alert(`You have ${asiPoints} ability score improvement point(s) to spend.`);
+            return;
+        }
+        if (charClass === Class.Custom) {
+            if (!customClassDescription.trim()) {
+                alert('Please enter a description for your custom class.');
+                return;
+            }
+            if (primaryAbility === secondaryAbility) {
+                alert('Primary and Secondary abilities must be different.');
+                return;
+            }
+        }
         if (selectedClassSkills.length < classSkillData.count) {
             alert(`Please select ${classSkillData.count} skills for your class.`);
             return;
         }
-        if (charClass === Class.Wizard) {
-            const spellChoices = CLASSES_DATA[Class.Wizard].spellChoices!;
+        if (CLASSES_DATA[charClass].spellChoices) {
+            const spellChoices = CLASSES_DATA[charClass].spellChoices!;
             if (selectedSpells.cantrips.length < spellChoices.cantrips) {
                 alert(`Please select ${spellChoices.cantrips} cantrips.`);
                 return;
@@ -167,6 +235,7 @@ const CharacterCreationScreen: React.FC<CharacterCreationScreenProps> = ({ onSta
                 return;
             }
         }
+
 
         // Combine equipment
         const finalInventory: Item[] = [];
@@ -199,10 +268,15 @@ const CharacterCreationScreen: React.FC<CharacterCreationScreenProps> = ({ onSta
             gold: BACKGROUNDS_DATA[background].gold,
             skills: [...backgroundSkills, ...selectedClassSkills],
             spells: [...selectedSpells.cantrips, ...selectedSpells.level1],
+            classDescription: charClass === Class.Custom ? customClassDescription : undefined,
         };
         
         onStartGame(finalCharacter);
     };
+
+    const spellcastingClass = [Class.Wizard, Class.Necromancer].includes(charClass);
+    const spellData = charClass === Class.Wizard ? WIZARD_SPELLS : NECROMANCER_SPELLS;
+    const spellChoices = spellcastingClass ? CLASSES_DATA[charClass].spellChoices : undefined;
 
     return (
         <div className="min-h-screen bg-gray-900 text-gray-200 flex items-center justify-center p-4 font-sans">
@@ -229,6 +303,39 @@ const CharacterCreationScreen: React.FC<CharacterCreationScreenProps> = ({ onSta
                                 </select>
                             </div>
                         </section>
+
+                        {/* CUSTOM CLASS SECTION */}
+                        {charClass === Class.Custom && (
+                            <section className="space-y-4 mt-4 p-4 bg-gray-700/50 rounded-lg border border-gray-600">
+                                <h3 className="text-lg font-semibold text-yellow-400">Custom Class Details</h3>
+                                <div>
+                                    <label htmlFor="custom-description" className="block text-sm font-medium text-gray-400 mb-1">Class Description</label>
+                                    <textarea 
+                                        id="custom-description" 
+                                        value={customClassDescription} 
+                                        onChange={(e) => setCustomClassDescription(e.target.value)} 
+                                        className="w-full h-24 bg-gray-900 border border-gray-600 rounded-md py-2 px-3 focus:outline-none focus:ring-yellow-500 focus:border-yellow-500" 
+                                        placeholder="Describe your unique class concept. For example: A warrior who channels elemental energy through their tattoos to enhance their attacks."
+                                        required
+                                    ></textarea>
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label htmlFor="primary-ability" className="block text-sm font-medium text-gray-400 mb-1">Primary Ability</label>
+                                        <select id="primary-ability" value={primaryAbility} onChange={(e) => setPrimaryAbility(e.target.value as Ability)} className="w-full bg-gray-900 border border-gray-600 rounded-md py-2 px-3 focus:outline-none focus:ring-yellow-500 focus:border-yellow-500">
+                                            {Object.values(Ability).map(ab => <option key={ab} value={ab}>{ab}</option>)}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label htmlFor="secondary-ability" className="block text-sm font-medium text-gray-400 mb-1">Secondary Ability</label>
+                                        <select id="secondary-ability" value={secondaryAbility} onChange={(e) => setSecondaryAbility(e.target.value as Ability)} className="w-full bg-gray-900 border border-gray-600 rounded-md py-2 px-3 focus:outline-none focus:ring-yellow-500 focus:border-yellow-500">
+                                             {Object.values(Ability).map(ab => <option key={ab} value={ab}>{ab}</option>)}
+                                        </select>
+                                    </div>
+                                </div>
+                            </section>
+                        )}
+
                         <section>
                            <label htmlFor="background" className="block text-sm font-medium text-gray-400 mb-1">Background</label>
                            <select id="background" value={background} onChange={(e) => setBackground(e.target.value as Background)} className="w-full bg-gray-700 border border-gray-600 rounded-md py-2 px-3 focus:outline-none focus:ring-yellow-500 focus:border-yellow-500">
@@ -290,19 +397,19 @@ const CharacterCreationScreen: React.FC<CharacterCreationScreenProps> = ({ onSta
                             </div>
                         </section>
                         {/* Spell Section */}
-                        {charClass === Class.Wizard && (
-                             <section>
+                        {spellcastingClass && spellChoices && (
+                            <section>
                                 <h3 className="text-lg font-semibold text-gray-300 mt-2 mb-2">Spells</h3>
                                 <div>
-                                    <h4 className="font-semibold text-gray-400 mb-1">Cantrips (Choose {CLASSES_DATA.Wizard.spellChoices?.cantrips}) ({selectedSpells.cantrips.length}/{CLASSES_DATA.Wizard.spellChoices?.cantrips})</h4>
+                                    <h4 className="font-semibold text-gray-400 mb-1">Cantrips (Choose {spellChoices.cantrips}) ({selectedSpells.cantrips.length}/{spellChoices.cantrips})</h4>
                                     <div className="grid grid-cols-2 gap-2 text-sm">
-                                        {WIZARD_SPELLS.cantrips.map(spell => (
-                                             <label key={spell.name} className="flex items-center space-x-2 p-2 rounded hover:bg-gray-700">
-                                                <input 
+                                        {spellData.cantrips.map(spell => (
+                                            <label key={spell.name} className="flex items-center space-x-2 p-2 rounded hover:bg-gray-700">
+                                                <input
                                                     type="checkbox"
                                                     className="form-checkbox bg-gray-600 border-gray-500 text-yellow-500 focus:ring-yellow-500"
                                                     checked={selectedSpells.cantrips.some(s => s.name === spell.name)}
-                                                    disabled={!selectedSpells.cantrips.some(s => s.name === spell.name) && selectedSpells.cantrips.length >= (CLASSES_DATA.Wizard.spellChoices?.cantrips ?? 0)}
+                                                    disabled={!selectedSpells.cantrips.some(s => s.name === spell.name) && selectedSpells.cantrips.length >= spellChoices.cantrips}
                                                     onChange={(e) => handleSpellChange(spell, 'cantrips', e.target.checked)}
                                                 />
                                                 <span>{spell.name}</span>
@@ -310,16 +417,16 @@ const CharacterCreationScreen: React.FC<CharacterCreationScreenProps> = ({ onSta
                                         ))}
                                     </div>
                                 </div>
-                                 <div className="mt-4">
-                                    <h4 className="font-semibold text-gray-400 mb-1">Level 1 Spells (Choose {CLASSES_DATA.Wizard.spellChoices?.level1} for Spellbook) ({selectedSpells.level1.length}/{CLASSES_DATA.Wizard.spellChoices?.level1})</h4>
+                                <div className="mt-4">
+                                <h4 className="font-semibold text-gray-400 mb-1">Level 1 Spells (Choose {spellChoices.level1} for Spellbook) ({selectedSpells.level1.length}/{spellChoices.level1})</h4>
                                     <div className="grid grid-cols-2 gap-2 text-sm">
-                                        {WIZARD_SPELLS.level1.map(spell => (
-                                             <label key={spell.name} className="flex items-center space-x-2 p-2 rounded hover:bg-gray-700">
-                                                <input 
+                                        {spellData.level1.map(spell => (
+                                            <label key={spell.name} className="flex items-center space-x-2 p-2 rounded hover:bg-gray-700">
+                                                <input
                                                     type="checkbox"
                                                     className="form-checkbox bg-gray-600 border-gray-500 text-yellow-500 focus:ring-yellow-500"
                                                     checked={selectedSpells.level1.some(s => s.name === spell.name)}
-                                                    disabled={!selectedSpells.level1.some(s => s.name === spell.name) && selectedSpells.level1.length >= (CLASSES_DATA.Wizard.spellChoices?.level1 ?? 0)}
+                                                    disabled={!selectedSpells.level1.some(s => s.name === spell.name) && selectedSpells.level1.length >= spellChoices.level1}
                                                     onChange={(e) => handleSpellChange(spell, 'level1', e.target.checked)}
                                                 />
                                                 <span>{spell.name}</span>
@@ -331,9 +438,8 @@ const CharacterCreationScreen: React.FC<CharacterCreationScreenProps> = ({ onSta
                         )}
 
 
-                        <div className="flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-4 pt-4">
-                            <button type="submit" className="w-full sm:w-auto bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-bold py-3 px-6 rounded-md transition duration-200">Begin Adventure</button>
-                            <button type="button" onClick={onLoadGame} className="w-full sm:w-auto bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-6 rounded-md transition duration-200">Load Game</button>
+                        <div className="flex items-center justify-center pt-4">
+                           <button type="submit" className="w-full sm:w-auto bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-bold py-3 px-6 rounded-md transition duration-200">Begin Adventure</button>
                         </div>
                     </form>
                 </div>
@@ -350,33 +456,56 @@ const CharacterCreationScreen: React.FC<CharacterCreationScreenProps> = ({ onSta
                             Suggest Stats
                         </button>
                     </div>
-                    <p className="text-sm text-gray-400 mb-4">Assign scores from ({STANDARD_ABILITY_SCORES.join(', ')}). Race bonuses are added automatically.</p>
+                    <p className="text-sm text-gray-400 mb-1">Assign scores from ({STANDARD_ABILITY_SCORES.join(', ')}).</p>
+                    {level >= 4 && (
+                        <p className="text-sm text-yellow-400 mb-4">Level 4 Reached! Spend {asiPoints} ability point(s). (+1 per point, max +2 per ability).</p>
+                    )}
                     <div className="space-y-2">
-                        <div className="grid grid-cols-5 items-center gap-2 text-xs text-center font-bold text-gray-400">
+                        <div className="grid grid-cols-7 items-center gap-2 text-xs text-center font-bold text-gray-400">
                             <span className="col-span-2 text-left">Ability</span>
                             <span>Base</span>
+                            <span className="col-span-2">ASI</span>
                             <span>Final</span>
                             <span>Mod</span>
                         </div>
-                        {Object.values(Ability).map(ability => (
-                            <div key={ability} className="grid grid-cols-5 items-center gap-2">
-                                <label className="font-semibold text-gray-300 col-span-2">{ability}</label>
-                                <select 
-                                    value={abilityScores[ability]}
-                                    onChange={e => handleAbilityChange(ability, e.target.value)}
-                                    className="bg-gray-700 border border-gray-600 rounded-md py-1 px-2 focus:outline-none focus:ring-yellow-500 focus:border-yellow-500 text-center"
-                                >
-                                    <option value={abilityScores[ability]} disabled>{abilityScores[ability]}</option>
-                                    {[abilityScores[ability], ...unassignedScores].sort((a,b) => a-b).map(score => <option key={score} value={score}>{score}</option>)}
-                                </select>
-                                <div className="text-center font-mono text-lg text-white font-bold">
-                                    {finalAbilities[ability]}
+                        {Object.values(Ability).map(ability => {
+                            const asiValue = appliedAsi[ability] || 0;
+                            const canIncrement = asiPoints > 0 && (abilityScores[ability] + asiValue) < 20 && asiValue < 2;
+                            const canDecrement = asiValue > 0;
+
+                            return (
+                                <div key={ability} className="grid grid-cols-7 items-center gap-2">
+                                    <label className="font-semibold text-gray-300 col-span-2">{ability}</label>
+                                    <select 
+                                        value={abilityScores[ability]}
+                                        onChange={e => handleAbilityChange(ability, e.target.value)}
+                                        className="bg-gray-700 border border-gray-600 rounded-md py-1 px-2 focus:outline-none focus:ring-yellow-500 focus:border-yellow-500 text-center"
+                                    >
+                                        <option value={abilityScores[ability]} disabled>{abilityScores[ability]}</option>
+                                        {[abilityScores[ability], ...unassignedScores].sort((a,b) => a-b).map(score => <option key={score} value={score}>{score}</option>)}
+                                    </select>
+                                    
+                                    <div className="col-span-2 flex items-center justify-center text-sm">
+                                        {level >= 4 ? (
+                                            <div className="flex items-center bg-gray-700 rounded">
+                                                <button type="button" onClick={() => handleAsiChange(ability, -1)} disabled={!canDecrement} className="px-2 py-1 disabled:opacity-50 hover:bg-gray-600 rounded-l">-</button>
+                                                <span className="px-2 font-mono text-white">{asiValue > 0 ? `+${asiValue}` : '0'}</span>
+                                                <button type="button" onClick={() => handleAsiChange(ability, 1)} disabled={!canIncrement} className="px-2 py-1 disabled:opacity-50 hover:bg-gray-600 rounded-r">+</button>
+                                            </div>
+                                        ) : (
+                                            <span className="text-gray-500">-</span>
+                                        )}
+                                    </div>
+
+                                    <div className="text-center font-mono text-lg text-white font-bold">
+                                        {finalAbilities[ability]}
+                                    </div>
+                                    <div className="text-center font-mono text-lg text-yellow-400">
+                                        {getModifierString(calculateModifier(finalAbilities[ability]))}
+                                    </div>
                                 </div>
-                                <div className="text-center font-mono text-lg text-yellow-400">
-                                    {getModifierString(calculateModifier(finalAbilities[ability]))}
-                                </div>
-                            </div>
-                        ))}
+                            )
+                        })}
                     </div>
                     <div className="mt-6 border-t border-gray-700 pt-4 text-center grid grid-cols-2 gap-4">
                          <div>

@@ -28,6 +28,13 @@ type EquipmentChoice = {
     [key: string]: (string | Item)[];
 };
 
+const CUSTOM_CLASS_EQUIPMENT: EquipmentChoice[] = [
+    { "Armor": ["Leather Armor", "Scale Mail", "Chain Mail"] },
+    { "Melee Weapon": ["Mace", "Longsword", "Two Daggers"] },
+    { "Ranged Weapon": ["Light Crossbow", "Shortbow"] },
+    { "Pack": ["Explorer's Pack", "Dungeoneer's Pack", "Scholar's Pack"] }
+];
+
 export const WIZARD_SPELLS: Record<'cantrips' | 'level1', Spell[]> = {
     cantrips: [
         { name: 'Acid Splash', description: 'Hurl a bubble of acid.' },
@@ -50,6 +57,21 @@ export const WIZARD_SPELLS: Record<'cantrips' | 'level1', Spell[]> = {
         { name: 'Silent Image', description: 'Create a minor visual illusion.' },
         { name: 'Sleep', description: 'Magically put creatures to sleep.' },
         { name: 'Thunderwave', description: 'A wave of thunderous force pushes creatures.' },
+    ]
+};
+
+export const NECROMANCER_SPELLS: Record<'cantrips' | 'level1', Spell[]> = {
+    cantrips: [
+        { name: 'Chill Touch', description: 'A spectral hand attacks one creature, preventing healing.' },
+        { name: 'Toll the Dead', description: 'A dolorous bell sound drains life from a creature.' },
+        { name: 'Mage Hand', description: 'Create a spectral, floating hand.' },
+        { name: 'Prestidigitation', description: 'Perform a minor magical trick.' },
+    ],
+    level1: [
+        { name: 'False Life', description: 'You gain temporary hit points.' },
+        { name: 'Ray of Sickness', description: 'A ray of green energy sickens a creature.' },
+        { name: 'Cause Fear', description: 'Project an image of a creature\'s worst fears.' },
+        { name: 'Inflict Wounds', description: 'A touch that channels necrotic energy.' },
     ]
 };
 
@@ -111,6 +133,37 @@ export const CLASSES_DATA: Record<Class, {
         abilityPriority: [Ability.Wisdom, Ability.Constitution, Ability.Strength, Ability.Charisma, Ability.Dexterity, Ability.Intelligence],
         skillChoices: { from: [Skill.History, Skill.Insight, Skill.Medicine, Skill.Persuasion, Skill.Religion], count: 2 }
     },
+    [Class.Monk]: {
+        hitDie: 8,
+        description: "A master of martial arts, harnessing the power of the body in pursuit of physical and spiritual perfection. At higher levels, they can project their ki as astral arms.",
+        equipmentChoices: [
+            { "Weapon": ["Shortsword", "Simple Weapon"] },
+            { "Pack": ["Dungeoneer's Pack", "Explorer's Pack"] },
+            { "Misc": ["10 Darts"] }
+        ],
+        abilityPriority: [Ability.Dexterity, Ability.Wisdom, Ability.Constitution, Ability.Intelligence, Ability.Charisma, Ability.Strength],
+        skillChoices: { from: [Skill.Acrobatics, Skill.Athletics, Skill.History, Skill.Insight, Skill.Religion, Skill.Stealth], count: 2 }
+    },
+    [Class.Necromancer]: {
+        hitDie: 6,
+        description: "A practitioner of forbidden arts, a Necromancer commands the forces of life and death, raising undead minions to serve their will.",
+        equipmentChoices: [
+            { "Weapon": ["Dagger", "Light Crossbow"] },
+            { "Arcane Focus": ["Component Pouch", "Arcane Focus"] },
+            { "Pack": ["Scholar's Pack", "Explorer's Pack"] },
+            { "Misc": ["Spellbook"] }
+        ],
+        abilityPriority: [Ability.Intelligence, Ability.Constitution, Ability.Wisdom, Ability.Dexterity, Ability.Charisma, Ability.Strength],
+        skillChoices: { from: [Skill.Arcana, Skill.History, Skill.Deception, Skill.Investigation, Skill.Medicine, Skill.Religion], count: 2 },
+        spellChoices: { cantrips: 2, level1: 4 }
+    },
+    [Class.Custom]: {
+        hitDie: 8,
+        description: "Create your own unique class by describing it and choosing your primary abilities.",
+        equipmentChoices: CUSTOM_CLASS_EQUIPMENT,
+        abilityPriority: [], // User will choose
+        skillChoices: { from: Object.values(Skill), count: 3 },
+    }
 };
 
 export const RACES_DATA: Record<Race, { description: string, abilityBonuses?: Partial<Record<Ability, number>> }> = {

@@ -11,12 +11,12 @@ interface GameScreenProps {
     isLoading: boolean;
     onSaveGame: () => void;
     onLoadGame: () => void;
-    onNewGame: () => void;
+    onGoToMenu: () => void;
     awaitingRoll: AwaitingRollState | null;
     onRollResult: (total: number, d20Roll: number, modifier: number) => void;
 }
 
-const GameScreen: React.FC<GameScreenProps> = ({ character, chatHistory, onSendMessage, isLoading, onSaveGame, onLoadGame, onNewGame, awaitingRoll, onRollResult }) => {
+const GameScreen: React.FC<GameScreenProps> = ({ character, chatHistory, onSendMessage, isLoading, onSaveGame, onLoadGame, onGoToMenu, awaitingRoll, onRollResult }) => {
     const [input, setInput] = useState('');
 
     const handleSubmit = (e: React.FormEvent) => {
@@ -34,9 +34,27 @@ const GameScreen: React.FC<GameScreenProps> = ({ character, chatHistory, onSendM
                 <div className="flex-shrink-0 mb-4 flex items-center justify-between">
                     <h1 className="text-2xl font-bold text-yellow-400">AI Game Master</h1>
                     <div className="flex space-x-2">
-                        <button onClick={onSaveGame} className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold py-2 px-3 rounded transition duration-200">Save</button>
-                        <button onClick={onLoadGame} className="bg-gray-600 hover:bg-gray-700 text-white text-sm font-bold py-2 px-3 rounded transition duration-200">Load</button>
-                        <button onClick={onNewGame} className="bg-red-600 hover:bg-red-700 text-white text-sm font-bold py-2 px-3 rounded transition duration-200">New Game</button>
+                        <button 
+                            onClick={onSaveGame} 
+                            disabled={isLoading}
+                            className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold py-2 px-3 rounded transition duration-200 disabled:bg-gray-500 disabled:cursor-not-allowed"
+                        >
+                            Save
+                        </button>
+                        <button 
+                            onClick={onLoadGame} 
+                            disabled={isLoading}
+                            className="bg-gray-600 hover:bg-gray-700 text-white text-sm font-bold py-2 px-3 rounded transition duration-200 disabled:bg-gray-500 disabled:cursor-not-allowed"
+                        >
+                            Load
+                        </button>
+                        <button 
+                            onClick={onGoToMenu} 
+                            disabled={isLoading}
+                            className="bg-gray-600 hover:bg-gray-700 text-white text-sm font-bold py-2 px-3 rounded transition duration-200 disabled:bg-gray-500 disabled:cursor-not-allowed"
+                        >
+                            Menu
+                        </button>
                     </div>
                 </div>
 

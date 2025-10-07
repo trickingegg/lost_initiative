@@ -1,22 +1,27 @@
 import { GoogleGenAI } from "@google/genai";
 import { Character, ChatMessage } from "../types";
 
-// FIX: Initialize the GoogleGenAI client according to guidelines.
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
-const SYSTEM_INSTRUCTION = `
+const getSystemInstruction = (setting: string) => `
 You are an expert Dungeons & Dragons Game Master.
 Your goal is to create a fun and engaging text-based RPG adventure.
 You will describe the world, the challenges, and the non-player characters.
 The user will tell you what their character does.
 You will then describe the outcome of their actions.
 
+The game setting is: ${setting}
+
 RULES:
 1.  **Narrate:** Describe what happens in a descriptive, second-person style ("You see...", "The goblin attacks you...").
 2.  **Control State via Commands:** You MUST use specific commands to modify the player's character sheet. The game engine will handle these commands. Do not describe these changes in the narrative (e.g., don't say "You lose 5 HP." or "You gain 10 XP."). Just use the command.
 3.  **Request Rolls:** When an action's outcome is uncertain, you MUST request a dice roll from the player using the [AWAIT_ROLL] command. The game will pause and wait for the player to roll. Do not invent roll results.
 4.  **Keep it concise:** Keep your responses to 1-3 paragraphs. End your response by presenting a situation for the player to react to.
-5.  **Be Creative:** Introduce interesting plot hooks, memorable characters, and challenging situations.
+5.  **Be Creative:** Introduce interesting plot hooks, memorable characters, and challenging situations based on the established setting.
+
+CLASS-SPECIFIC MECHANICS:
+- **Necromancer:** If the player is a Necromancer, they can attempt to raise a defeated humanoid enemy as a 'Shadow Servant'. When they attempt this, request an INTELLIGENCE ABILITY_CHECK. The DC should be based on the creature's power (e.g., DC 12 for a goblin, DC 16 for an orc chieftain). On a success, they gain a temporary ally that you manage narratively. The shadow is destroyed if it takes significant damage.
+- **Monk:** Describe their unarmed strikes with flair. Mention their potential to summon astral arms in the future when they achieve greater power.
 
 AVAILABLE COMMANDS:
 - \`[DAMAGE:amount]\`: Reduces the player's current HP. Example: \`[DAMAGE:5]\`
@@ -45,10 +50,14 @@ With a final, mighty heave, the door splinters and bursts open! You stumble into
 `;
 
 const buildPrompt = (playerPrompt: string, character: Character, history: ChatMessage[]): string => {
+    const classDisplay = character.class === 'Custom' && character.classDescription
+        ? `${character.class}: ${character.classDescription}`
+        : character.class;
+
     const characterSheet = `
 --- CHARACTER SHEET ---
 Name: ${character.name}
-Class: ${character.class}
+Class: ${classDisplay}
 Level: ${character.level}
 HP: ${character.hp.current}/${character.hp.max}
 Abilities: ${JSON.stringify(character.abilities)}
@@ -81,26 +90,26 @@ const parseAIResponse = (responseText: string): { narrative: string; commands: s
 export const getGameMasterResponse = async (
     prompt: string,
     character: Character,
-    chatHistory: ChatMessage[]
+    chatHistory: ChatMessage[],
+    setting: string,
+    temperature: number
 ): Promise<{ narrative: string; commands: string[] }> => {
-    // FIX: Use the recommended 'gemini-2.5-flash' model.
     const model = 'gemini-2.5-flash';
     const fullPrompt = buildPrompt(prompt, character, chatHistory);
+    const systemInstruction = getSystemInstruction(setting);
 
     try {
-        // FIX: Use the correct `ai.models.generateContent` method.
         const response = await ai.models.generateContent({
             model: model,
             contents: fullPrompt,
             config: {
-                systemInstruction: SYSTEM_INSTRUCTION,
-                temperature: 0.9,
+                systemInstruction: systemInstruction,
+                temperature: temperature,
                 topP: 1,
                 topK: 1,
             },
         });
         
-        // FIX: Access the generated text directly via the `text` property on the response.
         const responseText = response.text;
         
         if (!responseText) {

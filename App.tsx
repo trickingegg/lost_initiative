@@ -1,48 +1,70 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Character, GameState, Screen, AwaitingRollState, RollType, Ability } from './types';
 import CharacterCreationScreen from './components/CharacterCreationScreen';
 import GameScreen from './components/GameScreen';
+import AdventureSetupScreen from './components/AdventureSetupScreen';
+import MainMenuScreen from './components/MainMenuScreen';
+import SettingsScreen from './components/SettingsScreen';
+import ConfirmationDialog from './components/ConfirmationDialog';
 import { getGameMasterResponse } from './services/geminiService';
 import { processCommands } from './utils/commandProcessor';
-import { INITIAL_CHARACTER } from './constants';
 
 const App: React.FC = () => {
-    const [gameState, setGameState] = useState<GameState>({
-        character: null,
-        chatHistory: [],
-        screen: Screen.Creation,
-        isLoading: false,
-        awaitingRoll: null,
+    const [gameState, setGameState] = useState<GameState>(() => {
+        const savedSettings = localStorage.getItem('ai-game-master-settings');
+        const settings = savedSettings ? JSON.parse(savedSettings) : { temperature: 0.9 };
+        return {
+            character: null,
+            chatHistory: [],
+            screen: Screen.Menu,
+            isLoading: false,
+            awaitingRoll: null,
+            gameId: 0,
+            setting: null,
+            temperature: settings.temperature,
+        };
     });
+    
+    const [showExitConfirm, setShowExitConfirm] = useState(false);
+    const [saveFileExists, setSaveFileExists] = useState(false);
 
-    const handleSaveGame = useCallback(() => {
-        if (gameState.character) {
+    useEffect(() => {
+        const savedGame = localStorage.getItem('ai-game-master-save');
+        setSaveFileExists(!!savedGame);
+    }, []);
+
+    const handleSaveGame = () => {
+        if (gameState.character && gameState.setting) {
             try {
                 const stateToSave = {
                     character: gameState.character,
                     chatHistory: gameState.chatHistory,
+                    setting: gameState.setting,
                 };
                 localStorage.setItem('ai-game-master-save', JSON.stringify(stateToSave));
+                setSaveFileExists(true);
                 alert('Game saved!');
             } catch (error) {
                 console.error('Failed to save game:', error);
                 alert('Error: Could not save game.');
             }
         }
-    }, [gameState.character, gameState.chatHistory]);
+    };
 
-    const handleLoadGame = useCallback(() => {
+    const handleLoadGame = () => {
         try {
             const savedStateJSON = localStorage.getItem('ai-game-master-save');
             if (savedStateJSON) {
                 const savedState = JSON.parse(savedStateJSON);
-                setGameState({
+                setGameState(prev => ({
+                    ...prev,
                     character: savedState.character,
                     chatHistory: savedState.chatHistory,
+                    setting: savedState.setting,
                     screen: Screen.Game,
                     isLoading: false,
                     awaitingRoll: null,
-                });
+                }));
             } else {
                 alert('No saved game found.');
             }
@@ -50,31 +72,42 @@ const App: React.FC = () => {
             console.error('Failed to load game:', error);
             alert('Error: Could not load game.');
         }
-    }, []);
+    };
+    
+    const handleSetupComplete = (setting: string) => {
+        setGameState(prev => ({
+            ...prev,
+            setting: setting,
+            screen: Screen.Creation,
+        }));
+    };
 
-    const handleStartGame = useCallback((character: Character) => {
-        setGameState({
+    const handleStartGame = async (character: Character) => {
+        setGameState(prev => ({
+            ...prev,
             character,
-            chatHistory: [{ sender: 'gm', text: 'Your adventure begins! You find yourself standing at a crossroads. What do you do?' }],
+            chatHistory: [],
             screen: Screen.Game,
-            isLoading: false,
+            isLoading: true,
             awaitingRoll: null,
-        });
-    }, []);
+        }));
+        
+        await processAITurn("My adventure begins. Describe my starting location and situation.", [], character);
+    };
 
-    const processAITurn = useCallback(async (promptForAI: string, currentHistory: GameState['chatHistory']) => {
-        if (!gameState.character) return;
+    const processAITurn = async (promptForAI: string, currentHistory: GameState['chatHistory'], characterOverride?: Character) => {
+        const character = characterOverride || gameState.character;
+        if (!character || !gameState.setting) return;
     
         setGameState(prev => ({ ...prev, isLoading: true, awaitingRoll: null }));
     
         try {
-            const { narrative, commands } = await getGameMasterResponse(promptForAI, gameState.character, currentHistory);
+            const { narrative, commands } = await getGameMasterResponse(promptForAI, character, currentHistory, gameState.setting, gameState.temperature);
     
             const awaitRollCommand = commands.find(c => c.startsWith('[AWAIT_ROLL:'));
             const otherCommands = commands.filter(c => !c.startsWith('[AWAIT_ROLL:'));
     
-            // Apply state changes from commands first
-            const characterAfterCommands = processCommands(gameState.character, otherCommands);
+            const characterAfterCommands = processCommands(character, otherCommands);
             
             let newAwaitingRollState: AwaitingRollState | null = null;
             if (awaitRollCommand) {
@@ -103,16 +136,16 @@ const App: React.FC = () => {
             const errorHistory = [...currentHistory, { sender: 'gm' as const, text: 'The ancient magics are failing... (An error occurred). Please try again.' }];
             setGameState(prev => ({ ...prev, chatHistory: errorHistory, isLoading: false }));
         }
-    }, [gameState.character]);
+    };
 
-    const handleSendMessage = useCallback(async (message: string) => {
+    const handleSendMessage = async (message: string) => {
         if (gameState.isLoading || gameState.awaitingRoll) return;
         const newHistory = [...gameState.chatHistory, { sender: 'player' as const, text: message }];
         setGameState(prev => ({ ...prev, chatHistory: newHistory }));
         await processAITurn(message, newHistory);
-    }, [gameState.isLoading, gameState.awaitingRoll, gameState.chatHistory, processAITurn]);
+    };
 
-    const handleRollResult = useCallback(async (total: number, d20Roll: number, modifier: number) => {
+    const handleRollResult = async (total: number, d20Roll: number, modifier: number) => {
         if (!gameState.awaitingRoll || !gameState.character) return;
     
         const { ability, type, dc } = gameState.awaitingRoll;
@@ -121,38 +154,76 @@ const App: React.FC = () => {
         const playerRollText = `(Rolled a d20 for ${ability} ${typeText}: ${d20Roll} ${modifier >= 0 ? `+${modifier}`: modifier} = ${total})`;
         const newHistory = [...gameState.chatHistory, { sender: 'player' as const, text: playerRollText }];
         
-        // Immediately update chat history and clear roll state
         setGameState(prev => ({ ...prev, chatHistory: newHistory, awaitingRoll: null }));
         
         const aiPrompt = `My character rolled a total of ${total} for their ${ability} ${typeText} against a DC of ${dc}. Describe what happens now.`;
         
         await processAITurn(aiPrompt, newHistory);
-    }, [gameState.awaitingRoll, gameState.chatHistory, gameState.character, processAITurn]);
+    };
     
-    const handleNewGame = useCallback(() => {
-        if(window.confirm('Are you sure you want to start a new game? Any unsaved progress will be lost.')) {
-            setGameState({
-                character: null,
-                chatHistory: [],
-                screen: Screen.Creation,
-                isLoading: false,
-                awaitingRoll: null,
-            });
-            localStorage.removeItem('ai-game-master-save');
-        }
-    }, []);
+    const handleNewGame = () => {
+        setGameState(prev => ({
+            ...prev,
+            character: null,
+            chatHistory: [],
+            screen: Screen.Setup,
+            isLoading: false,
+            awaitingRoll: null,
+            gameId: prev.gameId + 1,
+            setting: null,
+        }));
+        localStorage.removeItem('ai-game-master-save');
+        setSaveFileExists(false);
+    };
 
-    useEffect(() => {
-        // Automatically try to load a game on startup
-        // handleLoadGame(); We don't call this to allow new game creation
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    const handleGoToMenu = () => {
+        setShowExitConfirm(true);
+    };
 
+    const handleConfirmExit = () => {
+        setGameState(prev => ({
+            ...prev,
+            character: null,
+            chatHistory: [],
+            screen: Screen.Menu,
+            isLoading: false,
+            awaitingRoll: null,
+            setting: null,
+        }));
+        setShowExitConfirm(false);
+    };
+
+    const handleSaveSettings = (newTemperature: number) => {
+        setGameState(prev => ({
+            ...prev,
+            temperature: newTemperature,
+            screen: Screen.Menu,
+        }));
+        localStorage.setItem('ai-game-master-settings', JSON.stringify({ temperature: newTemperature }));
+    };
 
     const renderScreen = () => {
         switch (gameState.screen) {
+            case Screen.Menu:
+                return <MainMenuScreen 
+                    onNewGame={handleNewGame} 
+                    onLoadGame={handleLoadGame} 
+                    onSettings={() => setGameState(p => ({ ...p, screen: Screen.Settings }))}
+                    canLoad={saveFileExists}
+                />;
+            case Screen.Settings:
+                return <SettingsScreen 
+                    currentTemperature={gameState.temperature}
+                    onSave={handleSaveSettings}
+                    onBack={() => setGameState(p => ({ ...p, screen: Screen.Menu }))}
+                />;
+            case Screen.Setup:
+                return <AdventureSetupScreen 
+                    onSetupComplete={handleSetupComplete} 
+                    onBack={() => setGameState(p => ({ ...p, screen: Screen.Menu }))}
+                />;
             case Screen.Creation:
-                return <CharacterCreationScreen onStartGame={handleStartGame} onNewGame={handleNewGame} onLoadGame={handleLoadGame} />;
+                return <CharacterCreationScreen key={gameState.gameId} onStartGame={handleStartGame} />;
             case Screen.Game:
                 if (!gameState.character) return null;
                 return (
@@ -163,7 +234,7 @@ const App: React.FC = () => {
                         isLoading={gameState.isLoading}
                         onSaveGame={handleSaveGame}
                         onLoadGame={handleLoadGame}
-                        onNewGame={handleNewGame}
+                        onGoToMenu={handleGoToMenu}
                         awaitingRoll={gameState.awaitingRoll}
                         onRollResult={handleRollResult}
                     />
@@ -173,7 +244,18 @@ const App: React.FC = () => {
         }
     };
 
-    return <div className="h-screen w-screen bg-gray-900 font-sans">{renderScreen()}</div>;
+    return (
+        <div className="h-screen w-screen bg-gray-900 font-sans">
+            {renderScreen()}
+            <ConfirmationDialog 
+                isOpen={showExitConfirm}
+                onConfirm={handleConfirmExit}
+                onCancel={() => setShowExitConfirm(false)}
+                title="Exit to Main Menu?"
+                message="Are you sure? Any unsaved progress will be lost."
+            />
+        </div>
+    );
 };
 
 export default App;

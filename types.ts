@@ -12,6 +12,9 @@ export enum Class {
     Wizard = 'Wizard',
     Rogue = 'Rogue',
     Cleric = 'Cleric',
+    Monk = 'Monk',
+    Necromancer = 'Necromancer',
+    Custom = 'Custom',
 }
 
 export enum Race {
@@ -79,6 +82,7 @@ export interface Character {
     name: string;
     race: Race;
     class: Class;
+    classDescription?: string;
     background: Background;
     level: number;
     xp: number;
@@ -102,6 +106,9 @@ export interface ChatMessage {
 }
 
 export enum Screen {
+    Menu = 'MENU',
+    Settings = 'SETTINGS',
+    Setup = 'SETUP',
     Creation = 'CREATION',
     Game = 'GAME',
 }
@@ -123,4 +130,7 @@ export interface GameState {
     screen: Screen;
     isLoading: boolean;
     awaitingRoll: AwaitingRollState | null;
+    gameId: number;
+    setting: string | null;
+    temperature: number;
 }
