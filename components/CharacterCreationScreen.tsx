@@ -7,7 +7,9 @@ import {
     BACKGROUNDS_DATA,
     STANDARD_ABILITY_SCORES,
     WIZARD_SPELLS,
-    NECROMANCER_SPELLS
+    NECROMANCER_SPELLS,
+    FULL_CASTER_SPELL_SLOTS,
+    XP_THRESHOLDS
 } from '../constants';
 import { calculateBaseAC, calculateMaxHp, getModifierString, calculateModifier } from '../utils/dnd';
 
@@ -75,8 +77,9 @@ const CharacterCreationScreen: React.FC<CharacterCreationScreenProps> = ({ onSta
         if (totalPointsFromLevel === 0 && Object.keys(appliedAsi).length > 0) {
             setAppliedAsi({});
         }
-        // FIX: Ensure undefined values are handled in reduce to prevent type errors.
-        const pointsSpent = Object.values(appliedAsi).reduce((sum, val) => sum + (val || 0), 0);
+        // Fix: Explicitly type the accumulator for reduce to ensure `pointsSpent` is a number.
+        // The value from Object.values can be inferred as unknown, so we coerce it to a number.
+        const pointsSpent = Object.values(appliedAsi).reduce<number>((sum, val) => sum + (Number(val) || 0), 0);
         setAsiPoints(totalPointsFromLevel - pointsSpent);
     }, [level, appliedAsi]);
 
@@ -100,7 +103,6 @@ const CharacterCreationScreen: React.FC<CharacterCreationScreenProps> = ({ onSta
     const finalAbilities = useMemo(() => {
         const withAsi: Record<Ability, number> = { ...abilityScores };
         for (const [ability, points] of Object.entries(appliedAsi)) {
-            // FIX: Use a more robust type check to ensure `points` is a number before performing addition.
             if (typeof points === 'number') {
                 withAsi[ability as Ability] += points;
             }
@@ -116,7 +118,7 @@ const CharacterCreationScreen: React.FC<CharacterCreationScreenProps> = ({ onSta
         return final;
     }, [abilityScores, race, appliedAsi]);
 
-    const createdCharacter = useMemo((): Omit<Character, 'inventory' | 'gold' | 'skills' | 'spells'> => {
+    const createdCharacter = useMemo((): Omit<Character, 'inventory' | 'gold' | 'skills' | 'spells' | 'spellSlots'> => {
         const maxHp = calculateMaxHp(level, charClass, finalAbilities[Ability.Constitution]);
         const ac = calculateBaseAC(finalAbilities[Ability.Dexterity]);
         
@@ -261,14 +263,29 @@ const CharacterCreationScreen: React.FC<CharacterCreationScreenProps> = ({ onSta
                 finalInventory.push(item as Item);
             }
         });
+        
+        let spellSlots = {};
+        const isFullCaster = [Class.Wizard, Class.Cleric, Class.Necromancer].includes(charClass);
+        if (isFullCaster && FULL_CASTER_SPELL_SLOTS[level as keyof typeof FULL_CASTER_SPELL_SLOTS]) {
+            const slotsForLevel = FULL_CASTER_SPELL_SLOTS[level as keyof typeof FULL_CASTER_SPELL_SLOTS];
+            spellSlots = Object.keys(slotsForLevel).reduce((acc, spellLevel) => {
+                const numericSpellLevel = parseInt(spellLevel);
+                acc[numericSpellLevel] = { current: slotsForLevel[numericSpellLevel], max: slotsForLevel[numericSpellLevel] };
+                return acc;
+            }, {} as Record<number, {current: number, max: number}>);
+        }
+
+        const startingXp = XP_THRESHOLDS[level - 1] || 0;
 
         const finalCharacter: Character = {
             ...createdCharacter,
+            xp: startingXp,
             inventory: finalInventory,
             gold: BACKGROUNDS_DATA[background].gold,
             skills: [...backgroundSkills, ...selectedClassSkills],
             spells: [...selectedSpells.cantrips, ...selectedSpells.level1],
             classDescription: charClass === Class.Custom ? customClassDescription : undefined,
+            spellSlots,
         };
         
         onStartGame(finalCharacter);

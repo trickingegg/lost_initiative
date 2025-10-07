@@ -78,6 +78,12 @@ export interface Spell {
     description: string;
 }
 
+export interface SpellSlotInfo {
+    current: number;
+    max: number;
+}
+
+
 export interface Character {
     name: string;
     race: Race;
@@ -98,6 +104,7 @@ export interface Character {
     inventory: Item[];
     spells: Spell[];
     quests: Quest[];
+    spellSlots: Record<number, SpellSlotInfo>; // Key is spell level
 }
 
 export interface ChatMessage {
@@ -116,6 +123,7 @@ export enum Screen {
 export enum RollType {
     ABILITY_CHECK = 'ABILITY_CHECK',
     SAVING_THROW = 'SAVING_THROW',
+    INITIATIVE = 'INITIATIVE',
 }
 
 export interface AwaitingRollState {
@@ -123,6 +131,25 @@ export interface AwaitingRollState {
     ability: Ability;
     dc: number;
 }
+
+export interface Enemy {
+    id: string;
+    name: string;
+    hp: {
+        current: number;
+        max: number;
+    };
+    ac: number;
+    initiative: number;
+    initiativeBonus: number;
+}
+
+export interface BattleState {
+    enemies: Enemy[];
+    turnOrder: string[]; // array of IDs ('player' or enemy ids)
+    currentTurnIndex: number;
+}
+
 
 export interface GameState {
     character: Character | null;
@@ -133,4 +160,5 @@ export interface GameState {
     gameId: number;
     setting: string | null;
     temperature: number;
+    battle: BattleState | null;
 }

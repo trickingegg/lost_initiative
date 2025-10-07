@@ -1,5 +1,6 @@
 import { Character, Item, Quest } from "../types";
 import { XP_THRESHOLDS } from "../constants";
+import { calculateMaxHp } from "./dnd";
 
 const handleAddItem = (character: Character, itemName: string, quantity: number): Character => {
     const existingItem = character.inventory.find(i => i.name.toLowerCase() === itemName.toLowerCase());
@@ -48,18 +49,20 @@ const handleSetQuest = (character: Character, title: string, description: string
 };
 
 const checkLevelUp = (character: Character): Character => {
-    if (character.level >= XP_THRESHOLDS.length) return character;
-    
-    const nextLevelXp = XP_THRESHOLDS[character.level];
-    if (character.xp >= nextLevelXp) {
-        return { ...character, level: character.level + 1 };
-        // In a more complex system, this would trigger HP increase, new spells, etc.
+    let newCharacter = { ...character };
+    // Use a while loop in case of multiple level-ups from a large XP gain
+    while (newCharacter.level < XP_THRESHOLDS.length && newCharacter.xp >= XP_THRESHOLDS[newCharacter.level]) {
+        const oldMaxHp = calculateMaxHp(newCharacter.level, newCharacter.class, newCharacter.abilities.Constitution);
+        newCharacter.level += 1;
+        const newMaxHp = calculateMaxHp(newCharacter.level, newCharacter.class, newCharacter.abilities.Constitution);
+        const hpGained = newMaxHp - oldMaxHp;
+        newCharacter.hp.max = newMaxHp;
+        newCharacter.hp.current += hpGained;
     }
-    return character;
+    return newCharacter;
 };
 
-
-export const processCommands = (character: Character, commands: string[]): Character => {
+export const processCharacterCommands = (character: Character, commands: string[]): Character => {
     let updatedCharacter = { ...character };
 
     commands.forEach(command => {
@@ -97,6 +100,24 @@ export const processCommands = (character: Character, commands: string[]): Chara
                 if (args.length === 2) {
                     updatedCharacter = handleSetQuest(updatedCharacter, args[0], args[1]);
                 }
+                break;
+            case 'CAST_SPELL':
+                const spellLevel = parseInt(args[1]);
+                if (updatedCharacter.spellSlots[spellLevel] && updatedCharacter.spellSlots[spellLevel].current > 0) {
+                    const newSlots = { ...updatedCharacter.spellSlots };
+                    newSlots[spellLevel].current -= 1;
+                    updatedCharacter.spellSlots = newSlots;
+                }
+                break;
+            case 'LONG_REST':
+                // Full heal
+                updatedCharacter.hp.current = updatedCharacter.hp.max;
+                // Restore all spell slots
+                const restoredSlots = { ...updatedCharacter.spellSlots };
+                for (const level in restoredSlots) {
+                    restoredSlots[level].current = restoredSlots[level].max;
+                }
+                updatedCharacter.spellSlots = restoredSlots;
                 break;
             default:
                 console.warn(`Unknown command type: ${type}`);

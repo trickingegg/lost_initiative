@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Character, Ability } from '../types';
 import { calculateModifier, getModifierString } from '../utils/dnd';
+import { XP_THRESHOLDS } from '../constants';
 import HealthBar from './HealthBar';
 import StatBlock from './StatBlock';
 
@@ -13,13 +14,17 @@ type Tab = 'Inventory' | 'Spells' | 'Quests';
 const CharacterSheet: React.FC<CharacterSheetProps> = ({ character }) => {
     const [activeTab, setActiveTab] = useState<Tab>('Inventory');
 
+    const xpForNextLevel = character.level < XP_THRESHOLDS.length 
+        ? XP_THRESHOLDS[character.level] 
+        : character.xp; // At max level, just show current xp
+
     return (
         <div className="flex flex-col h-full text-gray-300 space-y-4">
             {/* Header */}
             <div>
                 <h2 className="text-2xl font-bold text-yellow-400 truncate">{character.name}</h2>
                 <p className="text-gray-400">{`Level ${character.level} ${character.race} ${character.class}`}</p>
-                <p className="text-sm text-gray-500">XP: {character.xp} / {character.xp + 100} </p>
+                <p className="text-sm text-gray-500">XP: {character.xp} / {xpForNextLevel} </p>
             </div>
 
             {/* HP Bar */}
@@ -78,14 +83,32 @@ const CharacterSheet: React.FC<CharacterSheetProps> = ({ character }) => {
                         </ul>
                     )}
                     {activeTab === 'Spells' && (
-                         <ul className="space-y-2 text-sm">
-                            {character.spells.length > 0 ? character.spells.map(spell => (
-                                <li key={spell.name}>
-                                    <p className="font-semibold">{spell.name}</p>
-                                    <p className="text-xs text-gray-400">{spell.description}</p>
-                                </li>
-                            )) : <li className="text-gray-500">You know no spells.</li>}
-                        </ul>
+                         <div className="space-y-4 text-sm">
+                            <div className="mb-2">
+                                <h4 className="font-semibold text-gray-400 border-b border-gray-700 pb-1 mb-2">Spell Slots</h4>
+                                <div className="flex flex-wrap gap-2">
+                                    {Object.entries(character.spellSlots).map(([level, slots]) => (
+                                        <div key={level} className="text-center bg-gray-900 p-2 rounded">
+                                            <div className="text-xs text-gray-500">LVL {level}</div>
+                                            {/* FIX: Cast 'slots' to 'any' to bypass incorrect 'unknown' type inference from Object.entries. */}
+                                            <div className="font-mono text-lg">{(slots as any).current}/{(slots as any).max}</div>
+                                        </div>
+                                    ))}
+                                    {Object.keys(character.spellSlots).length === 0 && <p className="text-gray-500 text-xs">No spell slots.</p>}
+                                </div>
+                            </div>
+                            <ul className="space-y-1">
+                                {character.spells.length > 0 ? character.spells.map(spell => (
+                                    <li key={spell.name} className="group relative">
+                                        <p className="font-semibold cursor-default py-1">{spell.name}</p>
+                                        <div className="absolute bottom-full left-0 mb-2 w-64 p-3 bg-gray-900 border border-gray-600 rounded-md shadow-lg text-xs text-gray-300 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-opacity duration-300 z-10 pointer-events-none">
+                                            <h5 className="font-bold text-white mb-1">{spell.name}</h5>
+                                            {spell.description}
+                                        </div>
+                                    </li>
+                                )) : <li className="text-gray-500">You know no spells.</li>}
+                            </ul>
+                        </div>
                     )}
                     {activeTab === 'Quests' && (
                          <ul className="space-y-3 text-sm">

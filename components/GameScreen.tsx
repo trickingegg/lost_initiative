@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { Character, ChatMessage, AwaitingRollState } from '../types';
+import { Character, ChatMessage, AwaitingRollState, BattleState } from '../types';
 import CharacterSheet from './CharacterSheet';
 import StoryLog from './StoryLog';
 import DiceRollPrompt from './DiceRollPrompt';
+import BattleTracker from './BattleTracker';
 
 interface GameScreenProps {
     character: Character;
@@ -14,9 +15,10 @@ interface GameScreenProps {
     onGoToMenu: () => void;
     awaitingRoll: AwaitingRollState | null;
     onRollResult: (total: number, d20Roll: number, modifier: number) => void;
+    battle: BattleState | null;
 }
 
-const GameScreen: React.FC<GameScreenProps> = ({ character, chatHistory, onSendMessage, isLoading, onSaveGame, onLoadGame, onGoToMenu, awaitingRoll, onRollResult }) => {
+const GameScreen: React.FC<GameScreenProps> = ({ character, chatHistory, onSendMessage, isLoading, onSaveGame, onLoadGame, onGoToMenu, awaitingRoll, onRollResult, battle }) => {
     const [input, setInput] = useState('');
 
     const handleSubmit = (e: React.FormEvent) => {
@@ -26,6 +28,8 @@ const GameScreen: React.FC<GameScreenProps> = ({ character, chatHistory, onSendM
             setInput('');
         }
     };
+    
+    const isPlayerTurn = battle ? battle.turnOrder[battle.currentTurnIndex] === 'player' : true;
 
     return (
         <div className="h-screen w-screen flex flex-col md:flex-row bg-gray-800 text-gray-200">
@@ -57,7 +61,8 @@ const GameScreen: React.FC<GameScreenProps> = ({ character, chatHistory, onSendM
                         </button>
                     </div>
                 </div>
-
+                
+                {battle && <BattleTracker battle={battle} />}
                 <StoryLog chatHistory={chatHistory} />
                 
                 <div className="mt-4">
@@ -74,13 +79,13 @@ const GameScreen: React.FC<GameScreenProps> = ({ character, chatHistory, onSendM
                                 type="text"
                                 value={input}
                                 onChange={(e) => setInput(e.target.value)}
-                                placeholder="What do you do?"
+                                placeholder={battle ? (isPlayerTurn ? "Your turn. What do you do?" : "Waiting for opponent...") : "What do you do?"}
                                 className="flex-grow bg-gray-700 border border-gray-600 rounded-l-md shadow-sm py-2 px-4 focus:outline-none focus:ring-yellow-500 focus:border-yellow-500"
-                                disabled={isLoading}
+                                disabled={isLoading || (battle && !isPlayerTurn)}
                             />
                             <button
                                 type="submit"
-                                disabled={isLoading}
+                                disabled={isLoading || (battle && !isPlayerTurn)}
                                 className="bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-bold py-2 px-4 rounded-r-md transition duration-200 disabled:bg-gray-500 disabled:cursor-not-allowed h-[42px] w-[80px] flex items-center justify-center"
                             >
                                 {isLoading ? (

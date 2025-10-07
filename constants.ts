@@ -22,6 +22,7 @@ export const INITIAL_CHARACTER: Omit<Character, 'name' | 'race' | 'class'> = {
     inventory: [],
     spells: [],
     quests: [],
+    spellSlots: {},
 };
 
 type EquipmentChoice = {
@@ -47,16 +48,16 @@ export const WIZARD_SPELLS: Record<'cantrips' | 'level1', Spell[]> = {
         { name: 'Shocking Grasp', description: 'A touch delivers a shocking jolt.' },
     ],
     level1: [
-        { name: 'Burning Hands', description: 'A cone of fire erupts from your hands.' },
-        { name: 'Charm Person', description: 'You magically charm a humanoid.' },
-        { name: 'Detect Magic', description: 'Sense the presence of magic.' },
-        { name: 'Feather Fall', description: 'Slow the falling speed of creatures.' },
-        { name: 'Mage Armor', description: 'Touch a creature to grant magical armor.' },
-        { name: 'Magic Missile', description: 'Create darts of magical force.' },
-        { name: 'Shield', description: 'An invisible barrier protects you.' },
-        { name: 'Silent Image', description: 'Create a minor visual illusion.' },
-        { name: 'Sleep', description: 'Magically put creatures to sleep.' },
-        { name: 'Thunderwave', description: 'A wave of thunderous force pushes creatures.' },
+        { name: 'Burning Hands', description: 'As you hold your hands with thumbs touching and fingers spread, a thin sheet of flames shoots forth from your outstretched fingertips. Each creature in a 15-foot cone must make a Dexterity saving throw.' },
+        { name: 'Charm Person', description: 'You attempt to charm a humanoid you can see within range. It must make a Wisdom saving throw, and does so with advantage if you or your companions are fighting it.' },
+        { name: 'Detect Magic', description: 'For the duration, you sense the presence of magic within 30 feet of you. You can use your action to see a faint aura around any visible creature or object in the area that bears magic, and you learn its school of magic, if any.' },
+        { name: 'Feather Fall', description: 'Choose up to five falling creatures within range. A falling creature\'s rate of descent slows to 60 feet per round until the spell ends.' },
+        { name: 'Mage Armor', description: 'You touch a willing creature who isn\'t wearing armor, and a protective magical force surrounds it until the spell ends. The target\'s base AC becomes 13 + its Dexterity modifier.' },
+        { name: 'Magic Missile', description: 'You create three glowing darts of magical force. Each dart hits a creature of your choice that you can see within range. A dart deals 1d4 + 1 force damage to its target. The darts all strike simultaneously.' },
+        { name: 'Shield', description: 'An invisible barrier of magical force appears and protects you. Until the start of your next turn, you have a +5 bonus to AC, including against the triggering attack, and you take no damage from magic missile.' },
+        { name: 'Silent Image', description: 'You create the image of an object, a creature, or some other visible phenomenon that is no larger than a 15-foot cube. The image is purely visual; it isn\'t accompanied by sound, smell, or other sensory effects.' },
+        { name: 'Sleep', description: 'This spell sends creatures into a magical slumber. Roll 5d8; the total is how many hit points of creatures this spell can affect.' },
+        { name: 'Thunderwave', description: 'A wave of thunderous force sweeps out from you. Each creature in a 15-foot cube originating from you must make a Constitution saving throw. On a failed save, a creature takes 2d8 thunder damage and is pushed 10 feet away from you.' },
     ]
 };
 
@@ -68,12 +69,23 @@ export const NECROMANCER_SPELLS: Record<'cantrips' | 'level1', Spell[]> = {
         { name: 'Prestidigitation', description: 'Perform a minor magical trick.' },
     ],
     level1: [
-        { name: 'False Life', description: 'You gain temporary hit points.' },
-        { name: 'Ray of Sickness', description: 'A ray of green energy sickens a creature.' },
-        { name: 'Cause Fear', description: 'Project an image of a creature\'s worst fears.' },
-        { name: 'Inflict Wounds', description: 'A touch that channels necrotic energy.' },
+        { name: 'False Life', description: 'Bolstering yourself with a necromantic facsimile of life, you gain 1d4 + 4 temporary hit points for the duration.' },
+        { name: 'Ray of Sickness', description: 'A ray of sickening greenish energy lashes out toward a creature. Make a ranged spell attack. On a hit, the target takes 2d8 poison damage and may be poisoned.' },
+        { name: 'Cause Fear', description: 'You awaken the sense of mortality in one creature. The target must succeed on a Wisdom saving throw or become frightened of you.' },
+        { name: 'Inflict Wounds', description: 'Make a melee spell attack against a creature you can reach. On a hit, the target takes 3d10 necrotic damage.' },
     ]
 };
+
+// For Wizard, Cleric, Necromancer (which we treat as a wizard)
+// Format: { level: { spell_level_1: slots, spell_level_2: slots, ... } }
+export const FULL_CASTER_SPELL_SLOTS: Record<number, Record<number, number>> = {
+    1: { 1: 2 },
+    2: { 1: 3 },
+    3: { 1: 4, 2: 2 },
+    4: { 1: 4, 2: 3 },
+    5: { 1: 4, 2: 3, 3: 2 },
+};
+
 
 export const CLASSES_DATA: Record<Class, { 
     hitDie: number, 

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Character, AwaitingRollState } from '../types';
+import { Character, AwaitingRollState, RollType } from '../types';
 import { calculateModifier } from '../utils/dnd';
 
 interface DiceRollPromptProps {
@@ -55,7 +55,10 @@ const DiceRollPrompt: React.FC<DiceRollPromptProps> = ({ character, awaitingRoll
             `}</style>
             <h3 className="text-lg font-semibold text-yellow-400">Action Required</h3>
             <p className="text-gray-300 mb-4">
-                Make a <span className="font-bold">{abilityText} {typeText}</span>. (Difficulty: {awaitingRoll.dc})
+                {awaitingRoll.type === RollType.INITIATIVE
+                    ? <span className="font-bold text-white">Roll for Initiative!</span>
+                    : `Make a <span class="font-bold">${abilityText} ${typeText}</span>. (Difficulty: ${awaitingRoll.dc})`
+                }
             </p>
             
             <div className="h-20 flex items-center justify-center">
@@ -67,7 +70,7 @@ const DiceRollPrompt: React.FC<DiceRollPromptProps> = ({ character, awaitingRoll
                         {result.total !== null && (
                             <>
                                 <span className="mx-2 text-yellow-400">=</span>
-                                <span className={`text-3xl font-bold ${result.total >= awaitingRoll.dc ? 'text-green-400' : 'text-red-400'}`}>{result.total}</span>
+                                <span className={`text-3xl font-bold ${awaitingRoll.dc > 0 && result.total >= awaitingRoll.dc ? 'text-green-400' : 'text-white'}`}>{result.total}</span>
                             </>
                         )}
                     </div>
