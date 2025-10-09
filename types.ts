@@ -74,13 +74,24 @@ export interface Quest {
 }
 
 export interface Spell {
-    name: string;
+    name:string;
     description: string;
 }
 
 export interface SpellSlotInfo {
     current: number;
     max: number;
+}
+
+export interface Feature {
+    name: string;
+    description: string;
+}
+
+export interface Archetype {
+    name: string;
+    description: string;
+    features: Record<number, Feature[]>; // level -> features gained
 }
 
 
@@ -98,17 +109,22 @@ export interface Character {
     };
     ac: number;
     speed: number;
-    gold: number;
     abilities: Record<Ability, number>;
     skills: Skill[];
     inventory: Item[];
     spells: Spell[];
     quests: Quest[];
     spellSlots: Record<number, SpellSlotInfo>; // Key is spell level
+    archetype?: Archetype;
+    features: Feature[];
+    ki?: {
+        current: number;
+        max: number;
+    };
 }
 
 export interface ChatMessage {
-    sender: 'player' | 'gm';
+    sender: 'player' | 'gm' | 'system';
     text: string;
 }
 
@@ -144,12 +160,42 @@ export interface Enemy {
     initiativeBonus: number;
 }
 
+export interface Ally {
+    id: string;
+    name: string;
+    hp: {
+        current: number;
+        max: number;
+    };
+    ac: number;
+}
+
 export interface BattleState {
     enemies: Enemy[];
-    turnOrder: string[]; // array of IDs ('player' or enemy ids)
+    allies: Ally[];
+    turnOrder: string[]; // array of IDs ('player' or enemy/ally ids)
     currentTurnIndex: number;
 }
 
+export interface LevelUpSkillChoice {
+    from: Skill[];
+    count: number;
+}
+
+export interface LevelUpArchetypeChoice {
+    from: Archetype[];
+}
+
+export interface LevelUpSpellChoice {
+    count: number;
+}
+
+export interface AwaitingLevelUpChoices {
+    level: number;
+    skillChoice?: LevelUpSkillChoice;
+    archetypeChoice?: LevelUpArchetypeChoice;
+    spellChoice?: LevelUpSpellChoice;
+}
 
 export interface GameState {
     character: Character | null;
@@ -157,8 +203,14 @@ export interface GameState {
     screen: Screen;
     isLoading: boolean;
     awaitingRoll: AwaitingRollState | null;
+    awaitingLevelUpChoices: AwaitingLevelUpChoices | null;
     gameId: number;
     setting: string | null;
     temperature: number;
     battle: BattleState | null;
+    // Image generation state
+    imagesCache: Record<string, string>; // key -> base64 data URL
+    imagePrompts: Record<string, string>; // key -> prompt
+    currentImageKey: string | null; // The key of the image to display or offer to generate
+    isGeneratingImage: boolean;
 }

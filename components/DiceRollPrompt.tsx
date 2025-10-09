@@ -57,7 +57,7 @@ const DiceRollPrompt: React.FC<DiceRollPromptProps> = ({ character, awaitingRoll
             <p className="text-gray-300 mb-4">
                 {awaitingRoll.type === RollType.INITIATIVE
                     ? <span className="font-bold text-white">Roll for Initiative!</span>
-                    : `Make a <span class="font-bold">${abilityText} ${typeText}</span>. (Difficulty: ${awaitingRoll.dc})`
+                    : <>Make a <span className="font-bold">{abilityText} {typeText}</span>. (Difficulty: {awaitingRoll.dc})</>
                 }
             </p>
             

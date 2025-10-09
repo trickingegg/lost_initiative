@@ -118,7 +118,7 @@ const CharacterCreationScreen: React.FC<CharacterCreationScreenProps> = ({ onSta
         return final;
     }, [abilityScores, race, appliedAsi]);
 
-    const createdCharacter = useMemo((): Omit<Character, 'inventory' | 'gold' | 'skills' | 'spells' | 'spellSlots'> => {
+    const createdCharacter = useMemo((): Omit<Character, 'inventory' | 'skills' | 'spells' | 'spellSlots'> => {
         const maxHp = calculateMaxHp(level, charClass, finalAbilities[Ability.Constitution]);
         const ac = calculateBaseAC(finalAbilities[Ability.Dexterity]);
         
@@ -281,11 +281,11 @@ const CharacterCreationScreen: React.FC<CharacterCreationScreenProps> = ({ onSta
             ...createdCharacter,
             xp: startingXp,
             inventory: finalInventory,
-            gold: BACKGROUNDS_DATA[background].gold,
             skills: [...backgroundSkills, ...selectedClassSkills],
             spells: [...selectedSpells.cantrips, ...selectedSpells.level1],
             classDescription: charClass === Class.Custom ? customClassDescription : undefined,
             spellSlots,
+            ... (charClass === Class.Monk && { ki: { current: level, max: level } })
         };
         
         onStartGame(finalCharacter);

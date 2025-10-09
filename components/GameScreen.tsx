@@ -4,6 +4,7 @@ import CharacterSheet from './CharacterSheet';
 import StoryLog from './StoryLog';
 import DiceRollPrompt from './DiceRollPrompt';
 import BattleTracker from './BattleTracker';
+import ImagePanel from './ImagePanel';
 
 interface GameScreenProps {
     character: Character;
@@ -16,9 +17,19 @@ interface GameScreenProps {
     awaitingRoll: AwaitingRollState | null;
     onRollResult: (total: number, d20Roll: number, modifier: number) => void;
     battle: BattleState | null;
+    // Image props
+    imagesCache: Record<string, string>;
+    imagePrompts: Record<string, string>;
+    currentImageKey: string | null;
+    isGeneratingImage: boolean;
+    onGenerateImage: (key: string, prompt: string) => void;
 }
 
-const GameScreen: React.FC<GameScreenProps> = ({ character, chatHistory, onSendMessage, isLoading, onSaveGame, onLoadGame, onGoToMenu, awaitingRoll, onRollResult, battle }) => {
+const GameScreen: React.FC<GameScreenProps> = ({ 
+    character, chatHistory, onSendMessage, isLoading, onSaveGame, onLoadGame, onGoToMenu, 
+    awaitingRoll, onRollResult, battle,
+    imagesCache, imagePrompts, currentImageKey, isGeneratingImage, onGenerateImage
+}) => {
     const [input, setInput] = useState('');
 
     const handleSubmit = (e: React.FormEvent) => {
@@ -62,6 +73,14 @@ const GameScreen: React.FC<GameScreenProps> = ({ character, chatHistory, onSendM
                     </div>
                 </div>
                 
+                <ImagePanel 
+                    currentImageKey={currentImageKey}
+                    imagesCache={imagesCache}
+                    imagePrompts={imagePrompts}
+                    isGeneratingImage={isGeneratingImage}
+                    onGenerateImage={onGenerateImage}
+                />
+
                 {battle && <BattleTracker battle={battle} />}
                 <StoryLog chatHistory={chatHistory} />
                 

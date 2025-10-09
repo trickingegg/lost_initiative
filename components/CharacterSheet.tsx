@@ -9,7 +9,7 @@ interface CharacterSheetProps {
     character: Character;
 }
 
-type Tab = 'Inventory' | 'Spells' | 'Quests';
+type Tab = 'Inventory' | 'Spells' | 'Quests' | 'Features';
 
 const CharacterSheet: React.FC<CharacterSheetProps> = ({ character }) => {
     const [activeTab, setActiveTab] = useState<Tab>('Inventory');
@@ -23,15 +23,32 @@ const CharacterSheet: React.FC<CharacterSheetProps> = ({ character }) => {
             {/* Header */}
             <div>
                 <h2 className="text-2xl font-bold text-yellow-400 truncate">{character.name}</h2>
-                <p className="text-gray-400">{`Level ${character.level} ${character.race} ${character.class}`}</p>
+                <p className="text-gray-400">{`Level ${character.level} ${character.race} ${character.archetype ? character.archetype.name : character.class}`}</p>
                 <p className="text-sm text-gray-500">XP: {character.xp} / {xpForNextLevel} </p>
             </div>
 
             {/* HP Bar */}
             <HealthBar current={character.hp.current} max={character.hp.max} />
 
+            {/* Ki Points */}
+            {character.ki && (
+                <div className="mt-2">
+                    <div className="flex justify-between items-center mb-1 text-sm">
+                        <span className="font-bold text-gray-400">Ki Points</span>
+                        <span className="font-mono">{`${character.ki.current} / ${character.ki.max}`}</span>
+                    </div>
+                    <div className="w-full bg-gray-700 rounded-full h-4">
+                        <div
+                            className="bg-cyan-400 h-4 rounded-full transition-all duration-500 ease-out"
+                            style={{ width: `${character.ki.max > 0 ? (character.ki.current / character.ki.max) * 100 : 0}%` }}
+                        ></div>
+                    </div>
+                </div>
+            )}
+
+
             {/* Core Stats */}
-            <div className="grid grid-cols-3 gap-2 text-center">
+            <div className="grid grid-cols-2 gap-2 text-center">
                 <div className="bg-gray-800 p-2 rounded">
                     <div className="font-bold text-sm text-gray-400">Armor Class</div>
                     <div className="text-xl font-mono">{character.ac}</div>
@@ -39,10 +56,6 @@ const CharacterSheet: React.FC<CharacterSheetProps> = ({ character }) => {
                 <div className="bg-gray-800 p-2 rounded">
                     <div className="font-bold text-sm text-gray-400">Speed</div>
                     <div className="text-xl font-mono">{character.speed}ft</div>
-                </div>
-                 <div className="bg-gray-800 p-2 rounded">
-                    <div className="font-bold text-sm text-gray-400">Gold</div>
-                    <div className="text-xl font-mono">{character.gold}</div>
                 </div>
             </div>
 
@@ -61,7 +74,7 @@ const CharacterSheet: React.FC<CharacterSheetProps> = ({ character }) => {
             {/* Tabs */}
             <div className="flex-grow flex flex-col min-h-0">
                 <div className="border-b border-gray-700 flex">
-                    {(['Inventory', 'Spells', 'Quests'] as Tab[]).map(tab => (
+                    {(['Inventory', 'Spells', 'Features', 'Quests'] as Tab[]).map(tab => (
                         <button 
                             key={tab} 
                             onClick={() => setActiveTab(tab)}
@@ -109,6 +122,16 @@ const CharacterSheet: React.FC<CharacterSheetProps> = ({ character }) => {
                                 )) : <li className="text-gray-500">You know no spells.</li>}
                             </ul>
                         </div>
+                    )}
+                     {activeTab === 'Features' && (
+                         <ul className="space-y-3 text-sm">
+                            {character.features.length > 0 ? character.features.map(feature => (
+                                <li key={feature.name}>
+                                    <p className="font-semibold">{feature.name}</p>
+                                    <p className="text-xs text-gray-400">{feature.description}</p>
+                                </li>
+                            )) : <li className="text-gray-500">You have no special features.</li>}
+                        </ul>
                     )}
                     {activeTab === 'Quests' && (
                          <ul className="space-y-3 text-sm">
