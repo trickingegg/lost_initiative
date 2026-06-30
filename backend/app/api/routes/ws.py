@@ -1,17 +1,12 @@
 """
-WebSocket endpoint for streaming GM narrative token-by-token.
+WebSocket endpoint for streaming GM narrative.
 
-Protocol:
-  Client → Server: {"action": "I look around the room."}
-  Server → Client: {"type": "chunk", "text": "You step into..."}  (repeated)
-  Server → Client: {"type": "state_changes", "data": {...}}        (once, before done)
-  Server → Client: {"type": "suggested_actions", "data": [...]}    (once)
-  Server → Client: {"type": "done"}
-  Server → Client: {"type": "error", "message": "..."}             (on failure)
-
-Gemini streaming is done via `stream=True` on `generate_content`.
-Each candidate.text chunk is forwarded as soon as it arrives.
-After the full response, Pydantic validates it; on failure sends {"type": "error"}.
+Protocol (server → client):
+  {"type": "chunk",            "text": "..."}   — narrative chunk
+  {"type": "state_changes",    "data": {...}}   — after full response
+  {"type": "suggested_actions","data": [...]}   — after full response
+  {"type": "done"}                              — stream complete
+  {"type": "error",            "message": "..."} — on failure
 """
 from __future__ import annotations
 
@@ -34,9 +29,10 @@ async def narrative_stream(session_id: str, websocket: WebSocket) -> None:
             payload = json.loads(raw)
             action = payload.get("action", "").strip()
             if not action:
-                await websocket.send_text(json.dumps({"type": "error", "message": "Empty action"}))
+                await websocket.send_text(
+                    json.dumps({"type": "error", "message": "Empty action"})
+                )
                 continue
-
             await _handle_action(session_id, action, websocket)
 
     except WebSocketDisconnect:
@@ -44,127 +40,104 @@ async def narrative_stream(session_id: str, websocket: WebSocket) -> None:
     except Exception as exc:
         logger.error("WebSocket error for session %s: %s", session_id, exc)
         try:
-            await websocket.send_text(json.dumps({"type": "error", "message": str(exc)}))
+            await websocket.send_text(
+                json.dumps({"type": "error", "message": str(exc)})
+            )
         except Exception:
             pass
 
 
 async def _handle_action(session_id: str, action: str, websocket: WebSocket) -> None:
-    """Fetch session, call Gemini with streaming, forward chunks."""
+    from pydantic import ValidationError
+
     from app.ai_gm.context_manager import build_context_window
-    from app.ai_gm.schemas import GMResponse as AIGMResponse
-    from app.config import settings
-
-    # Lazy import to avoid initialising Gemini at module load
-    try:
-        import google.generativeai as genai
-        from pydantic import ValidationError
-    except ImportError as exc:
-        await websocket.send_text(json.dumps({"type": "error", "message": str(exc)}))
-        return
-
-    # Load session from DB
-    from app.db.session import AsyncSessionLocal
+    from app.ai_gm.memory import add_memory_event, build_event_summary
+    from app.ai_gm.providers.factory import get_provider
+    from app.ai_gm.schemas import GMResponse as AIGMSchema
     from app.db import crud
+    from app.db.session import AsyncSessionLocal
+    from app.models.domain import ChatMessage, GMResponse as DomainGMResponse
+    from app.services.session_service import apply_state_changes
 
+    # Load session
     async with AsyncSessionLocal() as db:
         session = await crud.get_session(db, session_id)
 
     if session is None:
-        await websocket.send_text(json.dumps({"type": "error", "message": "Session not found"}))
+        await websocket.send_text(
+            json.dumps({"type": "error", "message": "Session not found"})
+        )
         return
 
-    if not settings.gemini_api_key:
-        await websocket.send_text(json.dumps({
-            "type": "error",
-            "message": "GEMINI_API_KEY is not configured",
-        }))
-        return
-
-    genai.configure(api_key=settings.gemini_api_key)
-    model = genai.GenerativeModel(
-        model_name="gemini-1.5-flash",
-        generation_config=genai.GenerationConfig(
-            temperature=0.9,
-            response_mime_type="application/json",
-        ),
-    )
-
+    # Build prompt
     prompt = build_context_window(session)
     full_prompt = f"{prompt}\n\nPLAYER: {action}\n\nGM (JSON only):"
 
-    # Stream response chunks
+    # Stream chunks from provider
     full_text = ""
     try:
-        response = model.generate_content(full_prompt, stream=True)
-        for chunk in response:
-            text = chunk.text
-            if text:
-                full_text += text
-                await websocket.send_text(json.dumps({"type": "chunk", "text": text}))
+        provider = get_provider()
+        async for chunk in provider.stream(full_prompt):
+            full_text += chunk
+            await websocket.send_text(json.dumps({"type": "chunk", "text": chunk}))
     except Exception as exc:
-        logger.error("Gemini streaming error: %s", exc)
-        await websocket.send_text(json.dumps({"type": "error", "message": str(exc)}))
+        logger.error("Provider streaming error: %s", exc)
+        await websocket.send_text(
+            json.dumps({"type": "error", "message": str(exc)})
+        )
         return
 
-    # Validate final JSON
+    # Validate and persist
     try:
-        # Strip markdown fences if present
         cleaned = full_text.strip()
         if cleaned.startswith("```"):
             lines = cleaned.split("\n")
             cleaned = "\n".join(l for l in lines if not l.strip().startswith("```"))
+
         data = json.loads(cleaned)
-        gm_response = AIGMResponse.model_validate(data)
+        schema = AIGMSchema.model_validate(data)
 
         await websocket.send_text(json.dumps({
             "type": "state_changes",
-            "data": gm_response.state_changes.model_dump(),
+            "data": schema.state_changes.model_dump(),
         }))
         await websocket.send_text(json.dumps({
             "type": "suggested_actions",
-            "data": gm_response.suggested_actions,
+            "data": schema.suggested_actions,
         }))
 
-        # Persist session update
-        from app.services.session_service import apply_state_changes
-        from app.ai_gm.memory import build_event_summary, add_memory_event
-        from app.models.domain import ChatMessage, GMResponse as DomainGMResponse
-
         domain_response = DomainGMResponse(
-            narrative=gm_response.narrative,
-            state_changes=gm_response.state_changes,
-            internal_gm_notes=gm_response.internal_gm_notes,
-            suggested_actions=gm_response.suggested_actions,
-            image_prompt=gm_response.image_prompt,
-            image_key=gm_response.image_key,
+            narrative=schema.narrative,
+            state_changes=schema.state_changes,
+            internal_gm_notes=schema.internal_gm_notes,
+            suggested_actions=schema.suggested_actions,
+            image_prompt=schema.image_prompt,
+            image_key=schema.image_key,
         )
 
         event = build_event_summary(
-            changes=gm_response.state_changes,
-            narrative=gm_response.narrative,
+            changes=schema.state_changes,
+            narrative=schema.narrative,
             turn=session.turn_count + 1,
             player_action=action,
         )
-        updated_session = session
+        updated = session
         if event:
-            updated_session = add_memory_event(session, event)
-        updated_session = updated_session.model_copy(update={
-            "gm_internal_notes": gm_response.internal_gm_notes,
-        })
-        updated_session = apply_state_changes(updated_session, domain_response.state_changes)
-        updated_session = updated_session.model_copy(update={
+            updated = add_memory_event(updated, event)
+        updated = updated.model_copy(update={"gm_internal_notes": schema.internal_gm_notes})
+        updated = apply_state_changes(updated, domain_response.state_changes)
+        updated = updated.model_copy(update={
             "chat_history": list(session.chat_history) + [
                 ChatMessage(role="player", content=action),
-                ChatMessage(role="gm", content=gm_response.narrative),
+                ChatMessage(role="gm", content=schema.narrative),
             ]
         })
 
         async with AsyncSessionLocal() as db:
-            await crud.update_session(db, updated_session, domain_response)
+            await crud.update_session(db, updated, domain_response)
 
-    except (json.JSONDecodeError, Exception) as exc:
-        logger.warning("WebSocket: could not validate/persist GM response: %s", exc)
+    except (json.JSONDecodeError, ValidationError, Exception) as exc:
+        logger.warning("WS: response validation/persist failed: %s", exc)
         await websocket.send_text(json.dumps({
             "type": "error",
             "message": f"Response validation failed: {exc}",
