@@ -1,6 +1,5 @@
 """
-Game session endpoints.
-AI GM is called here; in Stage 1 it returns a placeholder response.
+Game session endpoints. AI GM is called on /action and /roll.
 """
 from __future__ import annotations
 
@@ -18,7 +17,9 @@ from app.db.crud import (
 from app.db.session import get_db
 from app.models.domain import (
     ActionResponse,
+    ChatMessage,
     CreateSessionRequest,
+    GameSession,
     GMResponse,
     LoadSlotRequest,
     PlayerActionRequest,
@@ -28,7 +29,7 @@ from app.models.domain import (
     SessionResponse,
     StateChanges,
 )
-from app.services.session_service import apply_state_changes
+from app.services.session_service import apply_state_changes, _to_engine_char, _from_engine_char
 
 router = APIRouter(prefix="/session", tags=["session"])
 
@@ -38,7 +39,6 @@ async def start_session(
     request: CreateSessionRequest,
     db: AsyncSession = Depends(get_db),
 ) -> SessionResponse:
-    from app.models.domain import GameSession
     session = GameSession(
         character=request.character,
         setting=request.setting,
@@ -66,26 +66,16 @@ async def player_action(
     request: PlayerActionRequest,
     db: AsyncSession = Depends(get_db),
 ) -> ActionResponse:
-    """
-    Process a player action. Stage 1: returns a stub GM response.
-    Stage 2 will call gm_service.process_action().
-    """
+    """Process a player action via AI GM."""
     session = await get_session(db, session_id)
     if session is None:
         raise HTTPException(status_code=404, detail="Session not found")
 
-    # Stage 1 stub — no AI yet
-    gm_response = GMResponse(
-        narrative=(
-            "The Game Master is processing your action... "
-            "(AI GM integration coming in Stage 2)"
-        ),
-        state_changes=StateChanges(),
-        suggested_actions=["Look around", "Wait", "Proceed"],
-    )
+    from app.ai_gm.gm_service import process_action
 
-    updated_session = apply_state_changes(session, gm_response.state_changes)
-    from app.models.domain import ChatMessage
+    gm_response, session_with_memory = await process_action(session, request.action)
+
+    updated_session = apply_state_changes(session_with_memory, gm_response.state_changes)
     updated_session = updated_session.model_copy(update={
         "chat_history": list(session.chat_history) + [
             ChatMessage(role="player", content=request.action),
@@ -103,16 +93,23 @@ async def submit_roll(
     request: RollResultRequest,
     db: AsyncSession = Depends(get_db),
 ) -> ActionResponse:
+    """Submit the result of a die roll requested by the GM."""
     session = await get_session(db, session_id)
     if session is None:
         raise HTTPException(status_code=404, detail="Session not found")
 
-    gm_response = GMResponse(
-        narrative=f"You rolled a {request.roll}. The outcome will be determined by the AI GM in Stage 2.",
-        state_changes=StateChanges(),
-    )
+    from app.ai_gm.gm_service import process_roll_result
 
-    updated_session = apply_state_changes(session, gm_response.state_changes)
+    gm_response, session_with_memory = await process_roll_result(session, request.roll)
+
+    updated_session = apply_state_changes(session_with_memory, gm_response.state_changes)
+    updated_session = updated_session.model_copy(update={
+        "chat_history": list(session.chat_history) + [
+            ChatMessage(role="system", content=f"[Roll: {request.roll}]"),
+            ChatMessage(role="gm", content=gm_response.narrative),
+        ]
+    })
+
     await update_session(db, updated_session, gm_response)
     return ActionResponse(session=updated_session, gm_response=gm_response)
 
@@ -129,15 +126,14 @@ async def take_rest(
 
     if request.type == "long":
         changes = StateChanges(long_rest=True)
-        narrative = "You take a long rest and recover your strength."
+        narrative = "You take a long rest. The world is quiet for a few hours, and you awaken refreshed."
     else:
         changes = StateChanges(short_rest=True)
-        narrative = f"You take a short rest, spending {request.hit_dice_spent} hit dice."
+        narrative = f"You take a short rest, spending {request.hit_dice_spent} hit dice to recover."
 
     gm_response = GMResponse(narrative=narrative, state_changes=changes)
 
     from app.game_engine.character import apply_short_rest
-    from app.services.session_service import _to_engine_char, _from_engine_char
 
     if request.type == "short" and request.hit_dice_spent > 0:
         ec = _to_engine_char(session.character)
