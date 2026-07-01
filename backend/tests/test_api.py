@@ -144,6 +144,27 @@ class TestSessionLifecycle:
         )
         assert resp.status_code == 404
 
+    @pytest.mark.asyncio
+    async def test_save_slot_duplicate_overwrites(self, client: AsyncClient):
+        """save_slot on same slot must overwrite, not fail."""
+        create_resp = await client.post("/api/session/start", json=SESSION_PAYLOAD)
+        session_id = create_resp.json()["session"]["id"]
+
+        # first save
+        r1 = await client.post(
+            f"/api/session/{session_id}/save",
+            json={"slot": 1},
+        )
+        assert r1.status_code == 200
+
+        # second save to same slot — overwrite, must succeed
+        r2 = await client.post(
+            f"/api/session/{session_id}/save",
+            json={"slot": 1},
+        )
+        assert r2.status_code == 200
+        assert r2.json()["saved"] is True
+
 
 class TestCharacterEndpoints:
     @pytest.mark.asyncio

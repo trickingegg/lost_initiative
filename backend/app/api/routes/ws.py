@@ -7,9 +7,11 @@ Protocol (server → client):
   {"type": "suggested_actions","data": [...]}   — after full response
   {"type": "done"}                              — stream complete
   {"type": "error",            "message": "..."} — on failure
+  {"type": "pong"}                              — heartbeat response
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 
@@ -19,15 +21,34 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["websocket"])
 
+# WebSocket heartbeat interval in seconds
+_HEARTBEAT_INTERVAL = 30.0
+
+
+async def _heartbeat_sender(websocket: WebSocket) -> None:
+    """Send periodic pings to keep the WebSocket connection alive."""
+    while True:
+        try:
+            await asyncio.sleep(_HEARTBEAT_INTERVAL)
+            await websocket.send_text(json.dumps({"type": "pong"}))
+        except Exception:
+            break
+
 
 @router.websocket("/ws/session/{session_id}/stream")
 async def narrative_stream(session_id: str, websocket: WebSocket) -> None:
     await websocket.accept()
+
+    heartbeat_task = asyncio.ensure_future(_heartbeat_sender(websocket))
+
     try:
         while True:
             raw = await websocket.receive_text()
             payload = json.loads(raw)
             action = payload.get("action", "").strip()
+            if action == "__ping__":
+                await websocket.send_text(json.dumps({"type": "pong"}))
+                continue
             if not action:
                 await websocket.send_text(
                     json.dumps({"type": "error", "message": "Empty action"})
@@ -44,6 +65,12 @@ async def narrative_stream(session_id: str, websocket: WebSocket) -> None:
                 json.dumps({"type": "error", "message": str(exc)})
             )
         except Exception:
+            pass
+    finally:
+        heartbeat_task.cancel()
+        try:
+            await heartbeat_task
+        except asyncio.CancelledError:
             pass
 
 

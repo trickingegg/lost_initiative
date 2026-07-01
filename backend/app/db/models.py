@@ -4,7 +4,7 @@ to avoid schema migrations when domain models evolve during development.
 """
 from datetime import datetime
 
-from sqlalchemy import DateTime, Integer, String, Text, func
+from sqlalchemy import DateTime, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.session import Base
@@ -26,6 +26,9 @@ class GameSessionRecord(Base):
 
 class SaveSlotRecord(Base):
     __tablename__ = "save_slots"
+    __table_args__ = (
+        UniqueConstraint("session_id", "slot", name="uq_save_slots_session_slot"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     session_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
