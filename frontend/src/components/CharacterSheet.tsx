@@ -91,18 +91,84 @@ export default function CharacterSheet() {
         ))}
       </div>
 
-      {/* Death saves (shown when HP = 0) */}
+      {/* Death saves (enhanced: circles + animation when HP = 0) */}
       {character.hp_current === 0 && (
         <div className="bg-red-900/40 p-3 rounded border border-red-700">
-          <div className="text-sm font-bold text-red-400 mb-1">Death Saves</div>
-          <div className="flex gap-4 text-sm">
-            <span className="text-green-400">
-              Successes: {character.death_saves.successes}/3
-            </span>
-            <span className="text-red-400">
-              Failures: {character.death_saves.failures}/3
-            </span>
+          <div className="text-sm font-bold text-red-400 mb-2 flex items-center gap-2">
+            <span className="animate-pulse text-base">&#x2620;</span>
+            Death Saves
+            <span className="animate-pulse text-base">&#x2620;</span>
           </div>
+          <div className="flex items-center justify-around">
+            <div className="flex flex-col items-center gap-1">
+              <span className="text-xs font-semibold text-green-400">Successes</span>
+              <div className="flex gap-1">
+                {[0, 1, 2].map((i) => (
+                  <div
+                    key={`ds-${i}`}
+                    className={`w-5 h-5 rounded-full border-2 transition-colors duration-300 ${
+                      i < character.death_saves.successes
+                        ? "bg-green-500 border-green-400"
+                        : "border-gray-600 bg-transparent"
+                    }`}
+                  />
+                ))}
+              </div>
+            </div>
+            <div className="flex flex-col items-center gap-1">
+              <span className="text-xs font-semibold text-red-400">Failures</span>
+              <div className="flex gap-1">
+                {[0, 1, 2].map((i) => (
+                  <div
+                    key={`df-${i}`}
+                    className={`w-5 h-5 rounded-full border-2 transition-colors duration-300 ${
+                      i < character.death_saves.failures
+                        ? "bg-red-600 border-red-500 animate-pulse"
+                        : "border-gray-600 bg-transparent"
+                    }`}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Exhaustion */}
+      {character.exhaustion > 0 && (
+        <div className="bg-yellow-900/30 p-3 rounded border border-yellow-700">
+          <div className="text-sm font-bold text-yellow-400 mb-1">
+            Exhaustion: Level {character.exhaustion} / 6
+          </div>
+          <div className="flex gap-1">
+            {Array.from({ length: 6 }, (_, i) => (
+              <div
+                key={`exh-${i}`}
+                className={`flex-1 h-2 rounded ${
+                  i < character.exhaustion
+                    ? i >= 5
+                      ? "bg-red-600"
+                      : i >= 3
+                        ? "bg-orange-500"
+                        : "bg-amber-400"
+                    : "bg-gray-700"
+                }`}
+              />
+            ))}
+          </div>
+          <p className="text-xs text-gray-400 mt-1">
+            {character.exhaustion >= 6
+              ? "Death"
+              : character.exhaustion >= 5
+                ? "Speed 0"
+                : character.exhaustion >= 4
+                  ? "HP max halved"
+                  : character.exhaustion >= 3
+                    ? "Disadv. attacks & saves"
+                    : character.exhaustion >= 2
+                      ? "Speed halved"
+                      : "Disadv. ability checks"}
+          </p>
         </div>
       )}
 

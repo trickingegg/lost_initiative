@@ -44,7 +44,7 @@ export interface GameStore {
   /** Create a new session on the backend */
   startSession: (setting: string, storyTemplate: StoryTemplate) => Promise<void>;
   /** Create character via backend (computes AC, spell slots, etc.) */
-  createCharacter: (char: Omit<Character, "id" | "proficiency_bonus" | "ac" | "spell_slots" | "death_saves" | "features" | "conditions" | "quests" | "spells_known"> & {
+  createCharacter: (char: Omit<Character, "id" | "proficiency_bonus" | "ac" | "spell_slots" | "death_saves" | "exhaustion" | "features" | "conditions" | "quests" | "spells_known"> & {
     abilities: AbilityScores;
     skills: string[];
   }) => Promise<void>;
@@ -141,6 +141,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         spell_slots: {},
         conditions: [],
         death_saves: { successes: 0, failures: 0 },
+        exhaustion: 0,
         quests: [],
       };
       const created = await api.createCharacter(temp);
@@ -351,6 +352,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
       }
       if (changes.use_ki && char.ki_current != null) {
         char.ki_current = Math.max(0, char.ki_current - changes.use_ki);
+      }
+      if (changes.exhaustion_change != null) {
+        char.exhaustion = Math.max(0, char.exhaustion + changes.exhaustion_change);
       }
 
       // Battle updates

@@ -73,6 +73,7 @@ export interface Character {
   ki_max?: number;
   conditions: string[];
   death_saves: DeathSaves;
+  exhaustion: number;
   quests: Quest[];
 }
 
@@ -155,6 +156,8 @@ export interface StateChanges {
   clear_condition?: string;
   cast_spell?: Record<string, unknown> | null;
   use_ki?: number;
+  exhaustion_change?: number;
+  concentration_check?: Record<string, unknown> | null;
 }
 
 export interface GMResponse {
@@ -227,10 +230,12 @@ export type WsServerMessage =
 
 export const CLASSES = [
   "Fighter", "Wizard", "Rogue", "Cleric", "Monk", "Necromancer",
+  "Barbarian", "Paladin", "Ranger", "Sorcerer", "Warlock", "Bard", "Druid",
 ] as const;
 
 export const RACES = [
   "Human", "Elf", "Dwarf", "Halfling", "Half-Elf", "Tiefling",
+  "Dragonborn", "Gnome", "Half-Orc", "Aasimar",
 ] as const;
 
 export const BACKGROUNDS = [
