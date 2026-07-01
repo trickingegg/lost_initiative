@@ -85,6 +85,7 @@ class Character(BaseModel):
     ki_max: Optional[int] = None
     conditions: List[str] = Field(default_factory=list)
     death_saves: DeathSaves = Field(default_factory=DeathSaves)
+    exhaustion: int = 0
     quests: List[Quest] = Field(default_factory=list)
 
 
@@ -169,6 +170,8 @@ class StateChanges(BaseModel):
     clear_condition: Optional[str] = None
     cast_spell: Optional[dict] = None
     use_ki: Optional[int] = None
+    exhaustion_change: Optional[int] = None  # positive = add, negative = reduce
+    concentration_check: Optional[dict] = None  # {"damage": int, "con_save_roll": int}
 
 
 class GMResponse(BaseModel):

@@ -72,12 +72,18 @@ async def create_character(character: Character) -> Character:
 
 @router.get("/classes", response_model=List[str])
 async def list_classes() -> List[str]:
-    return ["Fighter", "Wizard", "Rogue", "Cleric", "Monk", "Necromancer"]
+    return [
+        "Fighter", "Wizard", "Rogue", "Cleric", "Monk", "Necromancer",
+        "Barbarian", "Paladin", "Ranger", "Sorcerer", "Warlock", "Bard", "Druid",
+    ]
 
 
 @router.get("/races", response_model=List[str])
 async def list_races() -> List[str]:
-    return ["Human", "Elf", "Dwarf", "Halfling", "Half-Elf", "Tiefling"]
+    return [
+        "Human", "Elf", "Dwarf", "Halfling", "Half-Elf", "Tiefling",
+        "Dragonborn", "Gnome", "Half-Orc", "Aasimar",
+    ]
 
 
 @router.get("/ability-modifier/{score}", response_model=Dict[str, int])

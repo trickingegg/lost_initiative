@@ -9,7 +9,9 @@ from typing import List, Optional
 
 from app.game_engine import character as char_engine
 from app.game_engine import combat as combat_engine
+from app.game_engine import concentration as conc_engine
 from app.game_engine import conditions as cond_engine
+from app.game_engine import exhaustion as ex_engine
 from app.game_engine import spells as spell_engine
 from app.game_engine.character import (
     AbilityScores as EngineAbilityScores,
@@ -64,6 +66,7 @@ def _to_engine_char(c: Character) -> EngineCharacter:
         ki_max=c.ki_max,
         conditions=tuple(c.conditions),
         death_saves={"successes": c.death_saves.successes, "failures": c.death_saves.failures},
+        exhaustion=c.exhaustion,
     )
 
 
@@ -77,6 +80,7 @@ def _from_engine_char(ec: EngineCharacter, original: Character) -> Character:
             successes=ec.death_saves.get("successes", 0),
             failures=ec.death_saves.get("failures", 0),
         ),
+        "exhaustion": getattr(ec, "exhaustion", 0),
         "spell_slots": {
             lvl: SpellSlot(current=slot.current, maximum=slot.maximum)
             for lvl, slot in ec.spell_slots.items()
@@ -129,9 +133,24 @@ def apply_state_changes(session: GameSession, changes: StateChanges) -> GameSess
     # 6. Rests
     if changes.long_rest:
         ec = char_engine.apply_long_rest(ec)
+        ec = ex_engine.clear_exhaustion(ec)
     elif changes.short_rest:
         # Short rest with 0 hit dice — just restore Warlock slots
         ec = spell_engine.restore_warlock_slots_on_short_rest(ec)
+
+    # 6a. Concentration check (after damage, before exhaustion)
+    if changes.concentration_check:
+        dmg = changes.concentration_check.get("damage", 0)
+        con_roll = changes.concentration_check.get("con_save_roll", 0)
+        ec = conc_engine.check_concentration(ec, dmg, con_roll)
+
+    # 6b. Exhaustion change
+    if changes.exhaustion_change is not None:
+        delta = changes.exhaustion_change
+        if delta > 0:
+            ec = ex_engine.apply_exhaustion(ec, delta)
+        elif delta < 0:
+            ec = ex_engine.reduce_exhaustion(ec, abs(delta))
 
     # Sync back to Pydantic character
     char = _from_engine_char(ec, char)
