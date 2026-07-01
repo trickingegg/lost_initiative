@@ -142,6 +142,7 @@ class EngineCharacter:
     ki_max: Optional[int] = None
     conditions: Tuple[str, ...] = field(default_factory=tuple)
     death_saves: Dict[str, int] = field(default_factory=lambda: {"successes": 0, "failures": 0})
+    exhaustion: int = 0
 
     def with_changes(self, **kwargs) -> "EngineCharacter":
         return replace(self, **kwargs)
