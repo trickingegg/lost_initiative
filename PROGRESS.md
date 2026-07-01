@@ -118,45 +118,6 @@ AI_PROVIDER=openai_compatible  # любой кастомный endpoint
 
 ## 🔲 Предстоит сделать
 
-### Этап 3 — Frontend (React + TypeScript)
-
-**Цель:** заменить god-component `App.tsx` из прототипа на полноценный SPA, подключённый к backend API.
-
-**Подготовка (выполнено):**
-- [x] Прототип вынесен в `frontend-prototype/` — чистый корень репозитория
-- [x] `README.md` переписан — отражает реальное состояние проекта
-- [x] `frontend/` scaffold создан: Vite + React 18 + TS + Tailwind CSS 4 + React Router
-- [x] `vite.config.ts` с proxy `/api` → `localhost:8000`, `/ws` → `ws://localhost:8000`
-- [x] `@/` path alias настроен (`src/`)
-- [x] TypeScript strict mode, сборка проходит без ошибок
-
-**Бэкенд доработки (выполнено):**
-- [x] `SaveSlotRecord` — добавлен `UniqueConstraint(session_id, slot)` 
-- [x] WebSocket — добавлен heartbeat каждые 30 секунд (`pong`)
-- [x] Тест на дублирующее сохранение в тот же слот (overwrite, не ошибка)
-- [x] Все 247 тестов проходят
-
-**Компоненты к портированию:**
-- [x] Убрать `App.tsx` (god-component) — разбить на store + компоненты
-- [x] `store/` — Zustand: `gameStore` (session, ui state, все экшены)
-- [x] `api/` — HTTP-клиент к FastAPI (fetch), WebSocket-клиент `NarrativeStream` с heartbeat
-- [x] `types/` — TypeScript типы, приведённые в соответствие с Pydantic схемами backend
-- [x] **Компоненты** (переработаны из прототипа, подключены к API):
-  - `CharacterSheet` — отображение персонажа, 5 табов (Inventory/Spells/Features/Quests/Conditions), death saves при 0 HP
-  - `StoryLog` — лента нарратива с WebSocket стримингом (streaming текст с pulse-анимацией)
-  - `DiceRollPrompt` — UI для бросков d20 (анимация, отправка на `/roll`)
-  - `BattleTracker` — initiative order, HP врагов/союзников, текущий ход
-  - `HealthBar` — полоска здоровья (зелёный/жёлтый/красный)
-  - `StatBlock` — блок характеристики (score + modifier)
-- [x] WebSocket интеграция — нарратив появляется постепенно, `state_changes` применяются после получения
-- [x] Экран создания персонажа (`CharacterCreationScreen`) — race, class, background, level, standard array ability scores
-- [x] Экран настройки приключения (`AdventureSetupScreen`) — story template + setting
-- [x] Главный игровой экран (`GameScreen`) — StoryLog + input + CharacterSheet sidebar + BattleTracker + DiceRoll + suggested actions
-- [x] Главное меню (`MainMenuScreen`) — New Game / Continue Setup
-- [x] Vitest тесты — 13 тестов (HealthBar, StatBlock, StoryLog), jsdom environment
-
----
-
 ### Этап 4 — Полная механика
 
 **Цель:** закрыть все механические дыры, добавить классы второй волны.

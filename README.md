@@ -30,7 +30,7 @@ player text ──→ POST /api/session/{id}/action ──→ AI GM (Gemini/Deep
 |------|--------|
 | 1 — Backend Core (game engine, API, DB) | ✅ Готово |
 | 2 — AI Game Master (structured output, память, провайдеры) | ✅ Готово |
-| 3 — Frontend (React SPA) | 🔲 В работе |
+| 3 — Frontend (React SPA) | ✅ Готово |
 | 4 — Полная механика (классы, расы, реакции) | 🔲 Предстоит |
 | 5 — Voice (STT/TTS) | 🔲 Предстоит |
 
@@ -49,12 +49,25 @@ uv run uvicorn app.main:app --reload --port 8000
 
 Swagger UI: http://localhost:8000/docs
 
+### Фронтенд
+
+```bash
+cd frontend
+npm install
+npm run dev
+# http://localhost:5173
+```
+
+Прокси в `vite.config.ts` направляет `/api` и `/ws` на бэкенд — фронтенд не требует отдельной настройки URL.
+
 ### Тесты
 
 ```bash
-cd backend
-uv run pytest
-# 247 тестов в game_engine, ai_gm и API
+# Бэкенд (247 тестов)
+cd backend && uv run pytest
+
+# Фронтенд (13 тестов)
+cd frontend && npm test
 ```
 
 ### Поддерживаемые AI-провайдеры
@@ -97,8 +110,8 @@ backend/                  # Python/FastAPI backend
     services/             # Бизнес-логика
   tests/                  # 247 тестов
 
-frontend-prototype/       # Прототип (React 19), будет заменён на frontend/
-frontend/                 # Целевой SPA (React + TypeScript + Vite, etapa 3)
+frontend-prototype/       # Прототип из AI Studio (React 19), референс для портирования
+frontend/                 # Готовый SPA (React 18 + TS + Vite + Tailwind 4 + Zustand)
 ```
 
 ## Лицензия
