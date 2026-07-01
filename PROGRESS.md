@@ -3,8 +3,8 @@
 ## Текущий статус
 
 **Ветка:** `cursor/dnd-ai-gm-3a5b`  
-**Тесты:** 246 passed, 0 failed  
-**Готово к запуску:** backend (нужен API ключ), frontend — прототип из корня репозитория
+**Тесты:** backend 247 passed, 0 failed | frontend 13 passed, 0 failed  
+**Готово к запуску:** backend (нужен API ключ), frontend — портирование завершено, WebSocket стриминг готов
 
 ---
 
@@ -122,23 +122,38 @@ AI_PROVIDER=openai_compatible  # любой кастомный endpoint
 
 **Цель:** заменить god-component `App.tsx` из прототипа на полноценный SPA, подключённый к backend API.
 
-- [ ] Убрать `App.tsx` (god-component) — разбить на store + компоненты
-- [ ] `store/` — Zustand или `useReducer`: `CharacterStore`, `SessionStore`, `BattleStore`
-- [ ] `api/` — HTTP-клиент к FastAPI (httpx/fetch), WebSocket-клиент для стриминга
-- [ ] `types/` — TypeScript типы, приведённые в соответствие с Pydantic схемами backend
-- [ ] Убрать `utils/commandProcessor.ts` (regex → structured output уже сделан)
-- [ ] **Компоненты** (переработать из прототипа, подключить к API):
-  - `CharacterSheet` — отображение/редактирование персонажа
-  - `StoryLog` — лента нарратива с WebSocket стримингом
-  - `DiceRoll` — UI для бросков (показывает результат, отправляет на `/roll`)
-  - `BattleTracker` — initiative order, HP врагов, текущий ход
-  - `SpellSlots` — состояние слотов (текущий/макс), расход
-  - `QuestLog` — активные/завершённые квесты
-  - `SaveSlots` — 3 слота с кнопками Save/Load
-  - `ConditionBadges` — визуальные иконки активных состояний
-- [ ] WebSocket интеграция — нарратив появляется постепенно, `state_changes` применяются после `done`
-- [ ] Экран создания персонажа (race, class, background, ability scores)
-- [ ] Vitest тесты компонентов
+**Подготовка (выполнено):**
+- [x] Прототип вынесен в `frontend-prototype/` — чистый корень репозитория
+- [x] `README.md` переписан — отражает реальное состояние проекта
+- [x] `frontend/` scaffold создан: Vite + React 18 + TS + Tailwind CSS 4 + React Router
+- [x] `vite.config.ts` с proxy `/api` → `localhost:8000`, `/ws` → `ws://localhost:8000`
+- [x] `@/` path alias настроен (`src/`)
+- [x] TypeScript strict mode, сборка проходит без ошибок
+
+**Бэкенд доработки (выполнено):**
+- [x] `SaveSlotRecord` — добавлен `UniqueConstraint(session_id, slot)` 
+- [x] WebSocket — добавлен heartbeat каждые 30 секунд (`pong`)
+- [x] Тест на дублирующее сохранение в тот же слот (overwrite, не ошибка)
+- [x] Все 247 тестов проходят
+
+**Компоненты к портированию:**
+- [x] Убрать `App.tsx` (god-component) — разбить на store + компоненты
+- [x] `store/` — Zustand: `gameStore` (session, ui state, все экшены)
+- [x] `api/` — HTTP-клиент к FastAPI (fetch), WebSocket-клиент `NarrativeStream` с heartbeat
+- [x] `types/` — TypeScript типы, приведённые в соответствие с Pydantic схемами backend
+- [x] **Компоненты** (переработаны из прототипа, подключены к API):
+  - `CharacterSheet` — отображение персонажа, 5 табов (Inventory/Spells/Features/Quests/Conditions), death saves при 0 HP
+  - `StoryLog` — лента нарратива с WebSocket стримингом (streaming текст с pulse-анимацией)
+  - `DiceRollPrompt` — UI для бросков d20 (анимация, отправка на `/roll`)
+  - `BattleTracker` — initiative order, HP врагов/союзников, текущий ход
+  - `HealthBar` — полоска здоровья (зелёный/жёлтый/красный)
+  - `StatBlock` — блок характеристики (score + modifier)
+- [x] WebSocket интеграция — нарратив появляется постепенно, `state_changes` применяются после получения
+- [x] Экран создания персонажа (`CharacterCreationScreen`) — race, class, background, level, standard array ability scores
+- [x] Экран настройки приключения (`AdventureSetupScreen`) — story template + setting
+- [x] Главный игровой экран (`GameScreen`) — StoryLog + input + CharacterSheet sidebar + BattleTracker + DiceRoll + suggested actions
+- [x] Главное меню (`MainMenuScreen`) — New Game / Continue Setup
+- [x] Vitest тесты — 13 тестов (HealthBar, StatBlock, StoryLog), jsdom environment
 
 ---
 
@@ -172,14 +187,26 @@ AI_PROVIDER=openai_compatible  # любой кастомный endpoint
 
 ## Быстрый старт
 
+### Backend
 ```bash
 cd backend
-cp .env.example .env     # выбрать провайдер, добавить API ключ
-pip install -r requirements.txt
-uvicorn app.main:app --reload --port 8000
+cp .env.example .env          # выбрать провайдер, добавить API ключ
+uv venv && uv pip install -r requirements.txt
+uv run uvicorn app.main:app --reload --port 8000
 # Swagger UI: http://localhost:8000/docs
 # Тесты:
-pytest
+uv run pytest
+```
+
+### Frontend
+```bash
+cd frontend
+npm install
+npm run dev
+# http://localhost:5173
+
+# Тесты:
+npm test
 ```
 
 Минимальная конфигурация для DeepSeek (дешевле Gemini):

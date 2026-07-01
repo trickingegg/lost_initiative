@@ -14,12 +14,14 @@
 
 | Слой | Технология |
 |---|---|
-| Backend | Python 3.11 + FastAPI + Pydantic v2 |
+| Backend | Python 3.12 + FastAPI + Pydantic v2 |
 | Persistence | SQLite (SQLAlchemy async) |
-| AI | Google Gemini API — **structured output / JSON mode** |
-| Frontend | React 18 + TypeScript + Vite + Tailwind CSS |
-| Realtime | WebSocket (стриминг нарратива) |
-| Тесты | pytest (backend), Vitest (frontend) |
+| AI | Google Gemini, OpenAI, DeepSeek, Groq, OpenRouter, Ollama — **structured output / JSON mode** |
+| Frontend | React 18 + TypeScript + Vite + Tailwind CSS 4 |
+| State management | Zustand или useReducer |
+| Routing | React Router v6 |
+| Realtime | WebSocket (стриминг нарратива + heartbeat) |
+| Тесты | pytest 247 tests (backend), Vitest (frontend) |
 
 Переменные окружения:
 ```
@@ -38,6 +40,7 @@ MAX_MEMORY_EVENTS=10
 backend/
   app/
     main.py
+    config.py
     models/           — Pydantic domain models (Character, GameSession, GMResponse...)
     game_engine/      — Чистая D&D механика, без AI
       dice.py
@@ -46,28 +49,44 @@ backend/
       spells.py
       conditions.py
     ai_gm/            — AI Game Master сервис
-      gm_service.py   — buildContextWindow → callGemini → validateResponse
+      gm_service.py   — buildContextWindow → callAI → validateResponse
       context_manager.py
       memory.py
       prompts.py      — system prompt + story templates
       schemas.py      — Pydantic схемы structured output
+      providers/      — Abstraction layer: Gemini, OpenAI, DeepSeek, ...
     db/
       session.py
-      models.py       — ORM модели
+      models.py       — ORM модели (UniqueConstraint на save_slots)
       crud.py
     api/
       routes/
         game.py
         character.py
-        ws.py
+        ws.py         — WebSocket с heartbeat (30s)
+    services/
+      session_service.py
   tests/
+    247 тестов
 
 frontend/
   src/
+    App.tsx           — Роутинг (react-router-dom)
+    main.tsx
+    index.css         — Tailwind CSS 4
     components/       — UI (CharacterSheet, BattleTracker, StoryLog, DiceRoll...)
     store/            — Zustand или useReducer, NO god-component
     api/              — HTTP + WebSocket клиент
     types/            — TypeScript типы
+  package.json
+  tsconfig.json
+  vite.config.ts      — proxy к backend :8000
+
+frontend-prototype/   — Старый прототип из AI Studio (React 19), референс для портирования
+  components/
+  services/
+  utils/
+  App.tsx             — God-component, подлежит удалению
 ```
 
 ---
@@ -282,7 +301,7 @@ Story templates: `three_act`, `hex_crawl`, `dungeon_delve`, `political_intrigue`
 
 ---
 
-## Что взять из прототипа (папка `/workspace`)
+## Что взять из прототипа (папка `frontend-prototype/`)
 
 | Что | Откуда | Действие |
 |---|---|---|
@@ -304,7 +323,7 @@ Story templates: `three_act`, `hex_crawl`, `dungeon_delve`, `political_intrigue`
 `gm_service.py` с structured output → context_manager → memory → `/action` endpoint → тесты с мок Gemini
 
 **Этап 3 — Frontend**
-Адаптировать компоненты из прототипа → подключить к API → WebSocket стриминг → несколько слотов сохранений
+Создать `frontend/` SPA (Vite + React 18 + TS + Tailwind 4 + React Router) → адаптировать компоненты из `frontend-prototype/` → подключить к API → WebSocket стриминг → Zustand store → Vitest тесты
 
 **Этап 4 — Полная механика**
 Death saves UI → Conditions → Short rest → Все классы этапа 2 → Spell slots 6–9 → Proper AC
