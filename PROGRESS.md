@@ -3,8 +3,8 @@
 ## Текущий статус
 
 **Ветка:** `cursor/dnd-ai-gm-3a5b`  
-**Тесты:** backend 247 passed, 0 failed | frontend 13 passed, 0 failed  
-**Готово к запуску:** backend (нужен API ключ), frontend — портирование завершено, WebSocket стриминг готов
+**Тесты:** backend 279 passed, 0 failed | frontend 13 passed, 0 failed  
+**Готово к запуску:** backend (нужен API ключ), frontend — портирование завершено, WebSocket стриминг готов, полная D&D механика реализована
 
 ---
 
@@ -18,7 +18,7 @@
 - `config.py` через pydantic-settings — все настройки через env vars
 - `main.py` — lifespan startup, CORS, router registration
 
-**`game_engine/` — чистая D&D механика, без AI, 172 теста**
+**`game_engine/` — чистая D&D механика, без AI, 204 теста**
 
 | Модуль | Что реализовано |
 |---|---|
@@ -116,22 +116,56 @@ AI_PROVIDER=openai_compatible  # любой кастомный endpoint
 
 ---
 
-## 🔲 Предстоит сделать
+### Этап 3 — Frontend SPA
+
+**`frontend/` — структурированный React SPA**
+- React 18, TypeScript, Vite, Tailwind CSS 4, Zustand, React Router v6
+- API-клиент (HTTP + WebSocket с поддержкой стриминга и heartbeat)
+- Zustand store: все состояние игры, UI, персонаж, бой
+
+**Компоненты:**
+- `MainMenuScreen`, `AdventureSetupScreen`, `CharacterCreationScreen` (создание персонажа)
+- `GameScreen` — главный экран с чатом, rest-кнопками, save/load
+- `CharacterSheet` — HP/AC/abilities/spell slots/death saves/conditions/quests/inventory
+- `StoryLog`, `DiceRollPrompt`, `BattleTracker`, `HealthBar`, `StatBlock`
+- Vitest тесты: `HealthBar`, `StatBlock`, `StoryLog` (13 тестов)
+
+---
 
 ### Этап 4 — Полная механика
 
-**Цель:** закрыть все механические дыры, добавить классы второй волны.
+**Новые модули game engine:**
 
-- [ ] **Death saves UI** — отображение 3/3 ячеек, анимация при 0 HP, отправка броска
-- [ ] **Short rest UI** — выбор количества hit dice с ограничением
-- [ ] **Классы (этап 2):** Barbarian (rage, unarmored defense), Paladin (smite, spell slots от 2 уровня), Ranger (half-caster), Sorcerer (sorcery points), Warlock (pact magic, invocations), Bard (jack of all trades), Druid (wild shape)
-- [ ] **Расы (этап 2):** Dragonborn (breath weapon), Gnome (advantage vs magic), Half-Orc (relentless endurance), Aasimar (healing hands)
-- [ ] **Concentration** — tracking заклинаний, прерывание при уроне (Constitution save)
-- [ ] **Reaction** — Shield spell, Opportunity attack, Counterspell
-- [ ] **Exhaustion levels** (1–6) с накопительными штрафами
-- [ ] Spell slots 6–9 уровней уже есть в таблицах — нужен UI
+| Модуль | Что реализовано |
+|---|---|
+| `concentration.py` | `start_concentration` / `end_concentration`, `check_concentration` — прерывание при уроне (Con save, DC = max(10, урон/2)) |
+| `exhaustion.py` | 6 уровней exhaustion с кумулятивными штрафами: L1 — disadv. ability checks, L2 — speed halved, L3 — disadv. attacks/saves, L4 — HP max halved, L5 — speed 0, L6 — death. `apply_exhaustion`, `reduce_exhaustion`, `clear_exhaustion`, `get_effective_speed`, `get_effective_hp_max` |
+
+**Domain-модели:**
+- `Character.exhaustion: int = 0` — поле в Pydantic и EngineCharacter
+- `StateChanges.exhaustion_change: int` — GM может изменять истощение
+- `StateChanges.concentration_check` — GM может проверять концентрацию при уроне
+
+**Классы/расы (этап 2):**
+- Классы: Barbarian, Paladin, Ranger, Sorcerer, Warlock, Bard, Druid
+- Расы: Dragonborn, Gnome, Half-Orc, Aasimar
+- Spell slots 6-9 уровней уже в таблицах `FULL_CASTER_SLOTS` (были с Этапа 1)
+
+**Death saves UI:**
+- 6 кружков (3 зелёных успеха + 3 красных провала), пульсирующая анимация при 0 HP
+- Черепная анимация заголовка
+
+**Short rest UI:**
+- Модальное окно с выбором количества hit dice (range slider 0–level)
+- Отображение hit die (d8, d10, d12 в зависимости от класса) + CON mod
+
+**Exhaustion UI:**
+- Индикатор 6 уровней с цветовой градацией (жёлтый → оранжевый → красный)
+- Текстовая подсказка текущего штрафа
 
 ---
+
+## 🔲 Предстоит сделать
 
 ### Этап 5 — Voice
 
