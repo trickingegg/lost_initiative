@@ -20,7 +20,10 @@ class Settings(BaseSettings):
     database_url: str = "sqlite+aiosqlite:///./game.db"
 
     # ── Server / CORS ─────────────────────────────────────────────────────
-    cors_origins: str = "http://localhost:5173"
+    cors_origins: str = (
+        "http://localhost:3000,http://127.0.0.1:3000,"
+        "http://localhost:5173,http://127.0.0.1:5173"
+    )
 
     # ── Context window limits ─────────────────────────────────────────────
     max_history_messages: int = 25

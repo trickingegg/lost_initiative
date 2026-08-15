@@ -16,6 +16,11 @@ class RollRequest(BaseModel):
     reason: str
 
 
+class CombatantDamage(BaseModel):
+    id: str
+    amount: int = Field(default=0, ge=0)
+
+
 class StateChanges(BaseModel):
     damage: Optional[int] = None
     heal: Optional[int] = None
@@ -32,6 +37,7 @@ class StateChanges(BaseModel):
     clear_condition: Optional[str] = None
     cast_spell: Optional[dict] = None
     use_ki: Optional[int] = None
+    combatant_damage: List[CombatantDamage] = Field(default_factory=list)
 
 
 class GMResponse(BaseModel):

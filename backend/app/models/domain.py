@@ -111,6 +111,20 @@ class BattleState(BaseModel):
     round_number: int = 1
 
 
+class CombatantDamage(BaseModel):
+    """Damage to a non-player combatant in the current battle, keyed by combatant id."""
+    id: str
+    amount: int = Field(ge=0)
+
+
+class PendingLevelUp(BaseModel):
+    """Mechanical level-up already applied (HP, proficiency). UI choices come later."""
+    new_level: int
+    hp_increase: int
+    proficiency_bonus: int
+    new_features: List[str] = Field(default_factory=list)
+
+
 # ---------------------------------------------------------------------------
 # Memory event (long-term GM memory)
 # ---------------------------------------------------------------------------
@@ -140,6 +154,7 @@ class GameSession(BaseModel):
     images_cache: Dict[str, str] = Field(default_factory=dict)
     turn_count: int = 0
     memory_events: List[MemoryEvent] = Field(default_factory=list)
+    pending_level_up: Optional[PendingLevelUp] = None
 
 
 # ---------------------------------------------------------------------------
@@ -169,6 +184,7 @@ class StateChanges(BaseModel):
     clear_condition: Optional[str] = None
     cast_spell: Optional[dict] = None
     use_ki: Optional[int] = None
+    combatant_damage: List[CombatantDamage] = Field(default_factory=list)
 
 
 class GMResponse(BaseModel):

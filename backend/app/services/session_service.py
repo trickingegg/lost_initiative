@@ -5,7 +5,7 @@ No AI logic here.
 """
 from __future__ import annotations
 
-from typing import List, Optional
+import logging
 
 from app.game_engine import character as char_engine
 from app.game_engine import combat as combat_engine
@@ -20,15 +20,19 @@ from app.models.domain import (
     BattleState,
     Character,
     Combatant,
+    CombatantDamage,
     DeathSaves,
     GameSession,
-    GMResponse,
     Item,
-    MemoryEvent,
+    PendingLevelUp,
     Quest,
     SpellSlot,
     StateChanges,
 )
+
+logger = logging.getLogger(__name__)
+
+_ENGINE_NOTE_PREFIX = "[ENGINE]"
 
 
 # ---------------------------------------------------------------------------
@@ -71,6 +75,9 @@ def _from_engine_char(ec: EngineCharacter, original: Character) -> Character:
     return original.model_copy(update={
         "hp_current": ec.hp_current,
         "hp_max": ec.hp_max,
+        "xp": ec.xp,
+        "level": ec.level,
+        "proficiency_bonus": ec.proficiency_bonus,
         "ki_current": ec.ki_current,
         "conditions": list(ec.conditions),
         "death_saves": DeathSaves(
@@ -84,6 +91,69 @@ def _from_engine_char(ec: EngineCharacter, original: Character) -> Character:
     })
 
 
+def _append_engine_note(notes: str, message: str) -> str:
+    line = f"{_ENGINE_NOTE_PREFIX} {message}"
+    if not notes:
+        return line
+    return f"{notes}\n{line}"
+
+
+def _sync_player_combatant(battle_state: BattleState, char: Character) -> BattleState:
+    updated = []
+    for combatant in battle_state.combatants:
+        if combatant.is_player or combatant.id == "player":
+            updated.append(combatant.model_copy(update={
+                "hp_current": char.hp_current,
+                "hp_max": char.hp_max,
+            }))
+        else:
+            updated.append(combatant)
+    return battle_state.model_copy(update={"combatants": updated})
+
+
+def _apply_combatant_damage(
+    battle_state: BattleState,
+    hits: list[CombatantDamage],
+) -> tuple[BattleState, list[str]]:
+    by_id = {c.id: c for c in battle_state.combatants}
+    warnings: list[str] = []
+
+    for hit in hits:
+        if hit.amount <= 0:
+            continue
+        target = by_id.get(hit.id)
+        if target is None:
+            warnings.append(f"combatant_damage: unknown id '{hit.id}'")
+            continue
+        if target.is_player or target.id == "player":
+            warnings.append(
+                f"combatant_damage: id '{hit.id}' is the player — use damage, not combatant_damage"
+            )
+            continue
+        new_hp = max(0, target.hp_current - hit.amount)
+        by_id[hit.id] = target.model_copy(update={"hp_current": new_hp})
+
+    combatants = [by_id[c.id] for c in battle_state.combatants]
+    return battle_state.model_copy(update={"combatants": combatants}), warnings
+
+
+def _apply_level_ups(
+    ec: EngineCharacter,
+    pending: PendingLevelUp | None,
+) -> tuple[EngineCharacter, PendingLevelUp | None]:
+    target_level = min(char_engine.get_level_for_xp(ec.xp), char_engine.MAX_LEVEL)
+    latest = pending
+    while ec.level < target_level:
+        ec, choices = char_engine.level_up(ec)
+        latest = PendingLevelUp(
+            new_level=choices.new_level,
+            hp_increase=choices.hp_increase,
+            proficiency_bonus=choices.proficiency_bonus,
+            new_features=list(choices.new_features),
+        )
+    return ec, latest
+
+
 # ---------------------------------------------------------------------------
 # Main apply function
 # ---------------------------------------------------------------------------
@@ -95,24 +165,29 @@ def apply_state_changes(session: GameSession, changes: StateChanges) -> GameSess
     """
     char = session.character
     ec = _to_engine_char(char)
+    engine_notes: list[str] = []
 
-    # 1. Direct HP changes
+    # 1. Direct HP changes (player)
     if changes.damage is not None and changes.damage > 0:
         ec, _is_dead = combat_engine.apply_damage(ec, changes.damage)
     if changes.heal is not None and changes.heal > 0:
         new_hp = min(ec.hp_max, ec.hp_current + changes.heal)
         ec = ec.with_changes(hp_current=new_hp)
 
-    # 2. XP
+    # 2. XP + mechanical level-up (HP / proficiency). Subclass choices stay pending.
     if changes.add_xp is not None and changes.add_xp > 0:
         ec = ec.with_changes(xp=ec.xp + changes.add_xp)
+
+    pending_level_up = session.pending_level_up
+    ec, pending_level_up = _apply_level_ups(ec, pending_level_up)
 
     # 3. Conditions
     if changes.set_condition:
         try:
             ec = cond_engine.apply_condition(ec, changes.set_condition)
         except ValueError:
-            pass  # unknown condition — silently ignore to not break the session
+            logger.warning("Unknown condition ignored: %s", changes.set_condition)
+            engine_notes.append(f"Unknown condition ignored: {changes.set_condition}")
     if changes.clear_condition:
         ec = cond_engine.clear_condition(ec, changes.clear_condition)
 
@@ -178,7 +253,7 @@ def apply_state_changes(session: GameSession, changes: StateChanges) -> GameSess
                 "hp_max": e.get("hp", 10),
                 "ac": e.get("ac", 12),
                 "initiative_bonus": e.get("initiative_bonus", 0),
-                "cr": e.get("cr", 1),
+                "cr": e.get("cr", 0),
             }
             for i, e in enumerate(changes.start_battle)
         ] + [{
@@ -189,7 +264,9 @@ def apply_state_changes(session: GameSession, changes: StateChanges) -> GameSess
             "ac": char.ac,
             "initiative_bonus": char_engine.calculate_modifier(char.abilities.dexterity),
             "is_player": True,
+            "cr": 0,
         }]
+        raw_by_id = {row["id"]: row for row in combatants_raw}
         rolled = combat_engine.roll_initiative(combatants_raw)
         turn_order = [c.id for c in rolled]
         combatants_pydantic = [
@@ -201,6 +278,8 @@ def apply_state_changes(session: GameSession, changes: StateChanges) -> GameSess
                 ac=c.ac,
                 initiative=c.initiative,
                 is_player=c.is_player,
+                initiative_bonus=raw_by_id[c.id].get("initiative_bonus", 0),
+                cr=float(raw_by_id[c.id].get("cr", 0) or 0),
             )
             for c in rolled
         ]
@@ -209,13 +288,29 @@ def apply_state_changes(session: GameSession, changes: StateChanges) -> GameSess
             turn_order=turn_order,
         )
 
+    if changes.combatant_damage:
+        if battle_state is None:
+            logger.warning("combatant_damage ignored: no active battle")
+            engine_notes.append("combatant_damage ignored: no active battle")
+        else:
+            battle_state, dmg_warnings = _apply_combatant_damage(
+                battle_state, list(changes.combatant_damage)
+            )
+            engine_notes.extend(dmg_warnings)
+
     if changes.end_battle:
         battle_state = None
+    elif battle_state is not None:
+        battle_state = _sync_player_combatant(battle_state, char)
 
-    # Compose updated session
-    new_session = session.model_copy(update={
+    notes = session.gm_internal_notes
+    for message in engine_notes:
+        notes = _append_engine_note(notes, message)
+
+    return session.model_copy(update={
         "character": char,
         "battle_state": battle_state,
         "turn_count": session.turn_count + 1,
+        "pending_level_up": pending_level_up,
+        "gm_internal_notes": notes,
     })
-    return new_session

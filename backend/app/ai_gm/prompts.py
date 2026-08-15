@@ -66,7 +66,8 @@ RESPONSE_SCHEMA = """{
     "set_condition": "condition name or null",
     "clear_condition": "condition name or null",
     "cast_spell": {"name": "string", "level": int} or null,
-    "use_ki": "int or null"
+    "use_ki": "int or null",
+    "combatant_damage": [{"id": "combatant id from BATTLE STATE", "amount": int}]
   },
   "image_prompt": "string or null — Stable Diffusion prompt for a scene illustration, only when entering a new location",
   "image_key": "string or null — unique kebab-case key for caching",
@@ -93,6 +94,7 @@ CORE RULES:
 - When the engine reports a roll result or combat outcome, describe it dramatically.
 - Never invent dice rolls or decide outcomes yourself — always use await_roll to request them.
 - If combat should start, use start_battle with enemy stats. Never invent HP/AC mid-combat.
+- Player HP: use damage / heal. Enemy HP: use combatant_damage with the id from BATTLE STATE. Do not put player damage in combatant_damage.
 
 NARRATIVE STYLE:
 - Second-person present tense ("You step into...").
