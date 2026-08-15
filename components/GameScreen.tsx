@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { GameSession, GMResponse } from '../api/types';
+import type { GameSession, GMResponse } from '../sessionApi/types';
 import CharacterSheet from './CharacterSheet';
 import StoryLog from './StoryLog';
 import DiceRollPrompt from './DiceRollPrompt';

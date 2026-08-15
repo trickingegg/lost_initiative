@@ -1,6 +1,6 @@
 """
 Integration tests for the API layer.
-Uses SQLite in-memory via HTTPX async client + FastAPI test app.
+Uses a private in-memory SQLite DB so pytest cannot wipe the developer game.db.
 AI GM is always mocked — these tests must not call a live provider.
 """
 from unittest.mock import AsyncMock, patch
@@ -8,19 +8,38 @@ from unittest.mock import AsyncMock, patch
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.pool import StaticPool
 
+from app.db.session import Base, get_db
 from app.main import app
-from app.db.session import Base, engine
 from app.models.domain import GMResponse, StateChanges
 
 
 @pytest_asyncio.fixture(autouse=True)
 async def setup_db():
+    engine = create_async_engine(
+        "sqlite+aiosqlite:///:memory:",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+
+    session_factory = async_sessionmaker(
+        bind=engine,
+        class_=AsyncSession,
+        expire_on_commit=False,
+    )
+
+    async def override_get_db():
+        async with session_factory() as session:
+            yield session
+
+    app.dependency_overrides[get_db] = override_get_db
     yield
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
+    app.dependency_overrides.pop(get_db, None)
+    await engine.dispose()
 
 
 @pytest_asyncio.fixture

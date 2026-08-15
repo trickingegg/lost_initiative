@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import type { ChatMessage } from '../api/types';
+import type { ChatMessage } from '../sessionApi/types';
 
 interface StoryLogProps {
     chatHistory: ChatMessage[];

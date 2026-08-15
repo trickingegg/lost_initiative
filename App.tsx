@@ -16,9 +16,9 @@ import {
   postRoll,
   saveSlot,
   startSession,
-} from './api/client';
-import { toApiCharacter } from './api/mappers';
-import { GameSession, GMResponse, StoryTemplate } from './api/types';
+} from './sessionApi/client';
+import { toApiCharacter } from './sessionApi/mappers';
+import { GameSession, GMResponse, StoryTemplate } from './sessionApi/types';
 
 type Screen = 'menu' | 'settings' | 'setup' | 'creation' | 'game';
 

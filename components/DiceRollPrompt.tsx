@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import type { Character, RollRequest } from '../api/types';
-import { abilityScore } from '../api/mappers';
+import type { Character, RollRequest } from '../sessionApi/types';
+import { abilityScore } from '../sessionApi/mappers';
 import { calculateModifier } from '../utils/dnd';
 
 interface DiceRollPromptProps {

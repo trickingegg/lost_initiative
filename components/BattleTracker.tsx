@@ -1,5 +1,5 @@
 import React from 'react';
-import type { BattleState } from '../api/types';
+import type { BattleState } from '../sessionApi/types';
 import HealthBar from './HealthBar';
 
 interface BattleTrackerProps {

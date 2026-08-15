@@ -169,9 +169,9 @@
 
 ### Клиентский каркас
 
-- [x] HTTP-клиент (`api/client.ts`): start / get / action / roll / rest / save / load
+- [x] HTTP-клиент (`sessionApi/client.ts`): start / get / action / roll / rest / save / load
 - [x] Типы фронта = зеркало Pydantic (`hp_current`, `char_class`, `role`/`content`). Старый `types.ts` только для формы создания
-- [x] Маппер creation-формы → `CreateSessionRequest` (`api/mappers.ts`)
+- [x] Маппер creation-формы → `CreateSessionRequest` (`sessionApi/mappers.ts`)
 - [x] Ключ Gemini **убрать** из `vite.config.ts` `define`; proxy `/health` + `/api` + `/ws`
 - [x] Экран «backend недоступен» на меню, без чёрного экрана
 - [x] `App.tsx` больше не вызывает `getGameMasterResponse` и не гоняет `commandProcessor`
