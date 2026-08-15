@@ -5,9 +5,10 @@ interface MainMenuScreenProps {
     onLoadGame: () => void;
     onSettings: () => void;
     canLoad: boolean;
+    apiKeyConfigured?: boolean;
 }
 
-const MainMenuScreen: React.FC<MainMenuScreenProps> = ({ onNewGame, onLoadGame, onSettings, canLoad }) => {
+const MainMenuScreen: React.FC<MainMenuScreenProps> = ({ onNewGame, onLoadGame, onSettings, canLoad, apiKeyConfigured = true }) => {
     return (
         <div className="min-h-screen bg-gray-900 text-gray-200 flex items-center justify-center p-4 font-sans">
             <div className="w-full max-w-md text-center">
@@ -37,6 +38,12 @@ const MainMenuScreen: React.FC<MainMenuScreenProps> = ({ onNewGame, onLoadGame, 
                         Settings
                     </button>
                 </div>
+
+                {!apiKeyConfigured && (
+                    <p className="mt-8 text-sm text-amber-400">
+                        GEMINI_API_KEY is not set. You can create a character, but the Game Master cannot respond until the key is configured.
+                    </p>
+                )}
             </div>
         </div>
     );
