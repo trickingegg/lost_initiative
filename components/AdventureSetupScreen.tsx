@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
+import { STORY_TEMPLATES, type StoryTemplate } from '../sessionApi/types';
 
 interface AdventureSetupScreenProps {
-    onSetupComplete: (setting: string) => void;
+    onSetupComplete: (setting: string, storyTemplate: StoryTemplate) => void;
     onBack: () => void;
 }
 
@@ -20,17 +21,14 @@ type SettingKey = keyof typeof SETTINGS;
 const AdventureSetupScreen: React.FC<AdventureSetupScreenProps> = ({ onSetupComplete, onBack }) => {
     const [selectedSetting, setSelectedSetting] = useState<SettingKey>('Classic Fantasy');
     const [customSettingText, setCustomSettingText] = useState('');
+    const [storyTemplate, setStoryTemplate] = useState<StoryTemplate>('dungeon_delve');
 
     const handleContinue = () => {
-        if (selectedSetting === 'Custom') {
-            if (customSettingText.trim()) {
-                onSetupComplete(customSettingText.trim());
-            } else {
-                alert('Please describe your custom setting.');
-            }
-        } else {
-            onSetupComplete(SETTINGS[selectedSetting]);
+        const setting = selectedSetting === 'Custom' ? customSettingText.trim() : SETTINGS[selectedSetting];
+        if (!setting) {
+            return;
         }
+        onSetupComplete(setting, storyTemplate);
     };
 
     return (
@@ -65,6 +63,25 @@ const AdventureSetupScreen: React.FC<AdventureSetupScreenProps> = ({ onSetupComp
                     </div>
                 )}
 
+                <div className="mb-6">
+                    <h2 className="text-lg font-semibold text-gray-200 mb-3">Story structure</h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {STORY_TEMPLATES.map((template) => (
+                            <button
+                                type="button"
+                                key={template.id}
+                                onClick={() => setStoryTemplate(template.id)}
+                                className={`text-left p-3 border-2 rounded-lg ${
+                                    storyTemplate === template.id ? 'border-yellow-500 bg-gray-700/50' : 'border-gray-700 hover:border-gray-600'
+                                }`}
+                            >
+                                <h3 className="font-bold text-white">{template.label}</h3>
+                                <p className="text-sm text-gray-400 mt-1">{template.description}</p>
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
                 <div className="text-center mt-8 flex justify-center items-center space-x-4">
                     <button 
                         onClick={onBack}
@@ -74,7 +91,8 @@ const AdventureSetupScreen: React.FC<AdventureSetupScreenProps> = ({ onSetupComp
                     </button>
                     <button 
                         onClick={handleContinue}
-                        className="bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-bold py-3 px-8 rounded-md transition duration-200 text-lg"
+                        disabled={selectedSetting === 'Custom' && !customSettingText.trim()}
+                        className="bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-bold py-3 px-8 rounded-md transition duration-200 text-lg disabled:bg-gray-600 disabled:text-gray-400 disabled:cursor-not-allowed"
                     >
                         Continue to Character Creation
                     </button>
