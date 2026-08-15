@@ -1,5 +1,8 @@
 # DnD AI Game Master — Architecture Reference
 
+Живой трекер выполнения (что уже сделано, что дальше, чем не заниматься): [`PLAN.md`](./PLAN.md).  
+Этот файл — контракт архитектуры. Статусы этапов не вести здесь, чтобы не разъехались два источника правды.
+
 ## Цель
 
 Полноценная текстовая DnD 5e игра с ИИ в роли Game Master.
@@ -296,6 +299,8 @@ Story templates: `three_act`, `hex_crawl`, `dungeon_delve`, `political_intrigue`
 ---
 
 ## Этапы разработки
+
+Статус и чеклисты — в [`PLAN.md`](./PLAN.md). Ниже — исходное разбиение (контракт), без галок.
 
 **Этап 1 — Backend Core**
 Настройка проекта → game_engine модули с тестами → Pydantic модели → SQLite persistence → базовые API endpoints
