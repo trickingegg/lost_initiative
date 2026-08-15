@@ -73,7 +73,7 @@
 |---|---|---|
 | [#3](https://github.com/trickingegg/lost_initiative/pull/3) | фронт не падает без `GEMINI_API_KEY` | **смержен в `main`** |
 | [#4](https://github.com/trickingegg/lost_initiative/pull/4) | живой `PLAN.md` | **смержен в `main`** |
-| [#5](https://github.com/trickingegg/lost_initiative/pull/5) | этап 2.5: XP, бой, CORS, моки тестов | открыт, перебазирован на `main` |
+| [#5](https://github.com/trickingegg/lost_initiative/pull/5) | этап 2.5: XP, бой, CORS, моки тестов | **смержен в `main`** |
 
 ---
 
