@@ -7,7 +7,7 @@ import MainMenuScreen from './components/MainMenuScreen';
 import SettingsScreen from './components/SettingsScreen';
 import ConfirmationDialog from './components/ConfirmationDialog';
 import LevelUpScreen from './components/LevelUpScreen';
-import { getGameMasterResponse, generateImage } from './services/geminiService';
+import { getGameMasterResponse, generateImage, hasGeminiApiKey } from './services/geminiService';
 import { processCharacterCommands } from './utils/commandProcessor';
 import { ARCHETYPES_DATA } from './constants';
 
@@ -321,7 +321,10 @@ const App: React.FC = () => {
             }));
         } catch (error) {
             console.error('Error getting response from AI:', error);
-            const errorHistory = [...currentHistory, { sender: 'gm' as const, text: 'The ancient magics are failing... (An error occurred). Please try again.' }];
+            const errorText = error instanceof Error && /API key/i.test(error.message)
+                ? 'The Game Master cannot speak: GEMINI_API_KEY is not configured. Set it in the environment and reload.'
+                : 'The ancient magics are failing... (An error occurred). Please try again.';
+            const errorHistory = [...currentHistory, { sender: 'gm' as const, text: errorText }];
             setGameState(prev => ({ ...prev, chatHistory: errorHistory, isLoading: false }));
         }
     }, [gameState.character, gameState.setting, gameState.temperature, gameState.battle, gameState.imagePrompts, gameState.currentImageKey]);
@@ -513,6 +516,7 @@ const App: React.FC = () => {
                     onLoadGame={handleLoadGame} 
                     onSettings={() => setGameState(p => ({ ...p, screen: Screen.Settings }))}
                     canLoad={saveFileExists}
+                    apiKeyConfigured={hasGeminiApiKey()}
                 />;
             case Screen.Settings:
                 return <SettingsScreen 

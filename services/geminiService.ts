@@ -1,7 +1,21 @@
 import { GoogleGenAI } from "@google/genai";
 import { Character, ChatMessage, BattleState } from "../types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY || '';
+
+let aiClient: GoogleGenAI | null = null;
+
+export const hasGeminiApiKey = (): boolean => Boolean(apiKey);
+
+const getGeminiClient = (): GoogleGenAI => {
+    if (!apiKey) {
+        throw new Error('Gemini API key is not configured. Set GEMINI_API_KEY and reload.');
+    }
+    if (!aiClient) {
+        aiClient = new GoogleGenAI({ apiKey });
+    }
+    return aiClient;
+};
 
 const getSystemInstruction = (setting: string) => `
 You are an expert Dungeons & Dragons Game Master.
@@ -162,6 +176,8 @@ export const getGameMasterResponse = async (
     const fullPrompt = buildPrompt(prompt, character, chatHistory, battle);
     const systemInstruction = getSystemInstruction(setting);
 
+    const ai = getGeminiClient();
+
     try {
         const response = await ai.models.generateContent({
             model: model,
@@ -189,6 +205,8 @@ export const getGameMasterResponse = async (
 };
 
 export const generateImage = async (prompt: string): Promise<string> => {
+    const ai = getGeminiClient();
+
     try {
         console.log("Generating image with prompt:", prompt);
         const response = await ai.models.generateImages({
