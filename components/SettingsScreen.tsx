@@ -29,7 +29,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ currentTemperature, onS
                             <span className="text-yellow-400 font-mono text-lg">{temperature.toFixed(1)}</span>
                         </div>
                         <p className="text-sm text-gray-400 mb-3">
-                            Controls the randomness of the AI. Lower values make the GM more predictable, while higher values lead to more unexpected story developments.
+                            Stored locally on this browser. The Game Master itself runs on the backend; the API key stays in <code className="text-gray-300">backend/.env</code> and is not sent to the UI.
                         </p>
                         <input
                             id="temperature"

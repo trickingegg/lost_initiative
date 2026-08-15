@@ -142,6 +142,13 @@ async def take_rest(
         session = session.model_copy(update={"character": char})
 
     updated_session = apply_state_changes(session, gm_response.state_changes)
+    rest_label = "a long rest" if request.type == "long" else "a short rest"
+    updated_session = updated_session.model_copy(update={
+        "chat_history": list(updated_session.chat_history) + [
+            ChatMessage(role="player", content=f"I take {rest_label}."),
+            ChatMessage(role="gm", content=narrative),
+        ]
+    })
     await update_session(db, updated_session, gm_response)
     return ActionResponse(session=updated_session, gm_response=gm_response)
 

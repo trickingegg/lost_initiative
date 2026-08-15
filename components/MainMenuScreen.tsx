@@ -2,13 +2,16 @@ import React from 'react';
 
 interface MainMenuScreenProps {
     onNewGame: () => void;
-    onLoadGame: () => void;
+    onLoadSlot: (slot: number) => void;
     onSettings: () => void;
     canLoad: boolean;
-    apiKeyConfigured?: boolean;
+    backendOk: boolean | null;
+    error?: string | null;
 }
 
-const MainMenuScreen: React.FC<MainMenuScreenProps> = ({ onNewGame, onLoadGame, onSettings, canLoad, apiKeyConfigured = true }) => {
+const MainMenuScreen: React.FC<MainMenuScreenProps> = ({
+    onNewGame, onLoadSlot, onSettings, canLoad, backendOk, error,
+}) => {
     return (
         <div className="min-h-screen bg-gray-900 text-gray-200 flex items-center justify-center p-4 font-sans">
             <div className="w-full max-w-md text-center">
@@ -20,17 +23,26 @@ const MainMenuScreen: React.FC<MainMenuScreenProps> = ({ onNewGame, onLoadGame, 
                 <div className="space-y-4">
                     <button
                         onClick={onNewGame}
-                        className="w-full bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-bold py-4 px-6 rounded-md transition duration-200 text-xl"
+                        disabled={backendOk === false}
+                        className="w-full bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-bold py-4 px-6 rounded-md transition duration-200 text-xl disabled:bg-gray-600 disabled:text-gray-400 disabled:cursor-not-allowed"
                     >
                         New Game
                     </button>
-                    <button
-                        onClick={onLoadGame}
-                        disabled={!canLoad}
-                        className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-6 rounded-md transition duration-200 text-xl disabled:bg-gray-600 disabled:cursor-not-allowed"
-                    >
-                        Load Game
-                    </button>
+                    <div>
+                        <p className="text-sm text-gray-500 mb-2">Load Game</p>
+                        <div className="grid grid-cols-3 gap-2">
+                            {[1, 2, 3].map((slot) => (
+                                <button
+                                    key={slot}
+                                    onClick={() => onLoadSlot(slot)}
+                                    disabled={!canLoad}
+                                    className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-2 rounded-md transition duration-200 disabled:bg-gray-600 disabled:cursor-not-allowed"
+                                >
+                                    Slot {slot}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
                     <button
                         onClick={onSettings}
                         className="w-full bg-gray-700 hover:bg-gray-600 text-white font-bold py-4 px-6 rounded-md transition duration-200 text-xl"
@@ -39,9 +51,17 @@ const MainMenuScreen: React.FC<MainMenuScreenProps> = ({ onNewGame, onLoadGame, 
                     </button>
                 </div>
 
-                {!apiKeyConfigured && (
+                {error && (
+                    <p className="mt-8 text-sm text-red-300">{error}</p>
+                )}
+                {backendOk === false && (
                     <p className="mt-8 text-sm text-amber-400">
-                        GEMINI_API_KEY is not set. You can create a character, but the Game Master cannot respond until the key is configured.
+                        Game server is not reachable. Start the FastAPI backend on port 8000, then reload.
+                    </p>
+                )}
+                {backendOk === true && !canLoad && !error && (
+                    <p className="mt-8 text-sm text-gray-500">
+                        No saved session on this browser yet. Start a new game, then use Save.
                     </p>
                 )}
             </div>

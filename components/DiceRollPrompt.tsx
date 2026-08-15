@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { Character, AwaitingRollState, RollType } from '../types';
+import type { Character, RollRequest } from '../api/types';
+import { abilityScore } from '../api/mappers';
 import { calculateModifier } from '../utils/dnd';
 
 interface DiceRollPromptProps {
     character: Character;
-    awaitingRoll: AwaitingRollState;
-    onRoll: (total: number, d20Roll: number, modifier: number) => void;
+    awaitingRoll: RollRequest;
+    onRoll: (total: number) => void;
     isLoading: boolean;
 }
 
@@ -17,50 +18,42 @@ const DiceRollPrompt: React.FC<DiceRollPromptProps> = ({ character, awaitingRoll
         setIsRolling(true);
         setResult(null);
 
-        const modifier = calculateModifier(character.abilities[awaitingRoll.ability]);
-        
+        const modifier = calculateModifier(abilityScore(character.abilities, awaitingRoll.ability));
+
         let rollCount = 0;
         const rollAnimation = setInterval(() => {
-            setResult({ 
-                d20: Math.floor(Math.random() * 20) + 1, 
-                modifier, 
-                total: null 
+            setResult({
+                d20: Math.floor(Math.random() * 20) + 1,
+                modifier,
+                total: null,
             });
             rollCount++;
             if (rollCount >= 10) {
                 clearInterval(rollAnimation);
-                
+
                 const finalD20 = Math.floor(Math.random() * 20) + 1;
                 const finalTotal = finalD20 + modifier;
                 setResult({ d20: finalD20, modifier, total: finalTotal });
 
                 setTimeout(() => {
-                    onRoll(finalTotal, finalD20, modifier);
+                    onRoll(finalTotal);
                 }, 1500);
             }
         }, 100);
     };
 
-    const typeText = awaitingRoll.type.replace('_', ' ').toLowerCase();
-    const abilityText = awaitingRoll.ability;
+    const typeText = awaitingRoll.type.replace(/_/g, ' ').toLowerCase();
 
     return (
-        <div className="w-full bg-gray-700 border border-yellow-500/50 rounded-lg p-4 text-center flex flex-col items-center shadow-lg animate-fade-in">
-            <style>{`
-                @keyframes fade-in {
-                    from { opacity: 0; transform: translateY(10px); }
-                    to { opacity: 1; transform: translateY(0); }
-                }
-                .animate-fade-in { animation: fade-in 0.3s ease-out forwards; }
-            `}</style>
+        <div className="w-full bg-gray-700 border border-yellow-500/50 rounded-lg p-4 text-center flex flex-col items-center shadow-lg">
             <h3 className="text-lg font-semibold text-yellow-400">Action Required</h3>
-            <p className="text-gray-300 mb-4">
-                {awaitingRoll.type === RollType.INITIATIVE
-                    ? <span className="font-bold text-white">Roll for Initiative!</span>
-                    : <>Make a <span className="font-bold">{abilityText} {typeText}</span>. (Difficulty: {awaitingRoll.dc})</>
-                }
+            <p className="text-gray-300 mb-1">
+                Make a <span className="font-bold">{awaitingRoll.ability} {typeText}</span>. (Difficulty: {awaitingRoll.dc})
             </p>
-            
+            {awaitingRoll.reason && (
+                <p className="text-sm text-gray-400 mb-4">{awaitingRoll.reason}</p>
+            )}
+
             <div className="h-20 flex items-center justify-center">
                 {result && (
                     <div className="text-2xl font-mono">

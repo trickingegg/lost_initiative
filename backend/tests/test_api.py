@@ -227,6 +227,11 @@ class TestSessionLifecycle:
         assert rest_resp.status_code == 200
         data = rest_resp.json()
         assert data["session"]["character"]["hp_current"] == 18  # restored to max
+        history = data["session"]["chat_history"]
+        assert history[-2]["role"] == "player"
+        assert "long rest" in history[-2]["content"].lower()
+        assert history[-1]["role"] == "gm"
+        assert "long rest" in history[-1]["content"].lower()
 
     @pytest.mark.asyncio
     async def test_save_and_load_slot(self, client: AsyncClient):

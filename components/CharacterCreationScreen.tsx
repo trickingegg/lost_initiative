@@ -15,9 +15,10 @@ import { calculateBaseAC, calculateMaxHp, getModifierString, calculateModifier }
 
 interface CharacterCreationScreenProps {
     onStartGame: (character: Character) => void;
+    onBack?: () => void;
 }
 
-const CharacterCreationScreen: React.FC<CharacterCreationScreenProps> = ({ onStartGame }) => {
+const CharacterCreationScreen: React.FC<CharacterCreationScreenProps> = ({ onStartGame, onBack }) => {
     const [name, setName] = useState('');
     const [charClass, setCharClass] = useState<Class>(Class.Fighter);
     const [race, setRace] = useState(Race.Human);
@@ -455,7 +456,16 @@ const CharacterCreationScreen: React.FC<CharacterCreationScreenProps> = ({ onSta
                         )}
 
 
-                        <div className="flex items-center justify-center pt-4">
+                        <div className="flex items-center justify-center gap-3 pt-4">
+                           {onBack && (
+                               <button
+                                   type="button"
+                                   onClick={onBack}
+                                   className="w-full sm:w-auto bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-6 rounded-md transition duration-200"
+                               >
+                                   Back
+                               </button>
+                           )}
                            <button type="submit" className="w-full sm:w-auto bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-bold py-3 px-6 rounded-md transition duration-200">Begin Adventure</button>
                         </div>
                     </form>
