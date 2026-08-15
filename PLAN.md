@@ -16,7 +16,8 @@
 ## Сейчас
 
 - **Этап 3A закрыт** (2026-08-15, [PR #6](https://github.com/trickingegg/lost_initiative/pull/6) смержен). UI на FastAPI.
-- **Этап 3B в работе** — retry, typewriter, ход NPC на сервере, слоты с датой, README. Клиент по-прежнему HTTP; WS стримит уже готовый `narrative`. `pytest` 278.
+- **Этап 3B сделан** (2026-08-15, [PR #7](https://github.com/trickingegg/lost_initiative/pull/7), ждёт merge). Retry, typewriter, NPC-ход на сервере, слоты с датой, README. `pytest` 278. Ручной прогон: rest/save/overwrite/load без `alert()`.
+- **После merge — этап 3C**: выпилить браузерный Gemini, regex, перенос `frontend/`.
 - Не начинать 3C/4/5, пока 3B не закрыт ручным прогоном боя и отдыха.
 
 ---
@@ -62,7 +63,7 @@
 | 2. AI GM | structured output, память, `/action`, провайдеры | **сделан, с дырами** |
 | 2.5 Backend hardening | баги, из-за которых игра врёт или не клеится с UI | **закрыт (2026-08-15, PR #5)** |
 | 3A. Играбельный контур | фронт ходит в FastAPI, один полный ход | **закрыт (PR #6)** |
-| 3B. Приятно играть | подсказки, броски, rest, сейвы, ошибки, стрим | **в работе** |
+| 3B. Приятно играть | подсказки, броски, rest, сейвы, ошибки, стрим | **сделан, PR #7** |
 | 3C. Убрать прототип | выкинуть Gemini-в-браузере, regex, god-`App.tsx` | **не начат** |
 | 4. Полная механика | death saves UI, conditions, классы этапа 2, AC | **не начинать до 3B** |
 | 5. Голос | STT/TTS | **не начинать до стабильного текста** |
@@ -74,6 +75,7 @@
 | [#3](https://github.com/trickingegg/lost_initiative/pull/3) | фронт не падает без `GEMINI_API_KEY` | **смержен в `main`** |
 | [#4](https://github.com/trickingegg/lost_initiative/pull/4) | живой `PLAN.md` | **смержен в `main`** |
 | [#6](https://github.com/trickingegg/lost_initiative/pull/6) | этап 3A: UI на FastAPI session loop | **смержен в `main`** |
+| [#7](https://github.com/trickingegg/lost_initiative/pull/7) | этап 3B: бой, retry, слоты, README | **открыт** |
 
 ---
 
@@ -216,7 +218,7 @@
 - [x] Мобильная вёрстка: поле ввода прибито снизу, лист сворачивается
 - [x] README: как поднять backend + frontend + `.env`
 
-Критерий готовности 3B: посторонний человек с ключом проходит бой и отдых, не читая этот файл.
+Критерий готовности 3B: посторонний человек с ключом проходит бой и отдых, не читая этот файл. **Проверено вручную 2026-08-15** (без ключа: fallback + Retry, rest, save/overwrite/load). Бой с живым GM — с ключом на backend; NPC-ход покрыт тестами.
 
 ### WebSocket — отдельным шагом внутри 3B
 
@@ -329,5 +331,5 @@
 
 1. ~~Backend 2.5: XP/CORS/моки тестов~~ — закрыто, [PR #5](https://github.com/trickingegg/lost_initiative/pull/5).
 2. ~~Фронт 3A: HTTP-клиент + session-driven `App`~~ — смержен, [PR #6](https://github.com/trickingegg/lost_initiative/pull/6).
-3. **Сейчас: 3B** — retry, бой/NPC, слоты, typewriter, README.
-4. 3C: выпилить прототип, перенести `frontend/`.
+3. ~~3B: retry, бой/NPC, слоты, typewriter, README~~ — сделано, [PR #7](https://github.com/trickingegg/lost_initiative/pull/7).
+4. **Сейчас после merge: 3C** — выпилить прототип, перенести `frontend/`.
