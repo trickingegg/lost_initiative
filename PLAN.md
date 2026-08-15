@@ -15,9 +15,9 @@
 
 ## Сейчас
 
-- **Этап 2.5 закрыт** (2026-08-15, [PR #5](https://github.com/trickingegg/lost_initiative/pull/5)). XP/level сохраняются, `combatant_damage`, CORS+proxy, API-тесты без живого Gemini.
-- **Этап 3A в работе** — UI ходит в FastAPI: setup + story template, create → start → opening action, лист с сервера, save/load слотов 1–3. Ключ убран из Vite `define`.
-- Не начинать 3B/3C/4/5, пока 3A не закрыт ручным прогоном.
+- **Этап 3A сделан** (2026-08-15, [PR #6](https://github.com/trickingegg/lost_initiative/pull/6), ждёт merge). UI ходит в FastAPI: setup + story template, create → start → opening action, лист с сервера, save/load. Без ключа GM отдаёт fallback, UI не падает. `pytest` 266, `tsc --noEmit` зелёный.
+- **После merge — этап 3B**: подсказки, rest UX, ошибки/retry, бой, нормальный стрим нарратива.
+- Не начинать 3C/4/5, пока 3B не закрыт.
 
 ---
 
@@ -61,8 +61,8 @@
 | 1. Backend Core | движок, модели, SQLite, HTTP сессии | **сделан** |
 | 2. AI GM | structured output, память, `/action`, провайдеры | **сделан, с дырами** |
 | 2.5 Backend hardening | баги, из-за которых игра врёт или не клеится с UI | **закрыт (2026-08-15, PR #5)** |
-| 3A. Играбельный контур | фронт ходит в FastAPI, один полный ход | **в работе** |
-| 3B. Приятно играть | подсказки, броски, rest, сейвы, ошибки, стрим | **не начат** |
+| 3A. Играбельный контур | фронт ходит в FastAPI, один полный ход | **сделан, PR #6** |
+| 3B. Приятно играть | подсказки, броски, rest, сейвы, ошибки, стрим | **следующий** |
 | 3C. Убрать прототип | выкинуть Gemini-в-браузере, regex, god-`App.tsx` | **не начат** |
 | 4. Полная механика | death saves UI, conditions, классы этапа 2, AC | **не начинать до 3B** |
 | 5. Голос | STT/TTS | **не начинать до стабильного текста** |
@@ -73,7 +73,7 @@
 |---|---|---|
 | [#3](https://github.com/trickingegg/lost_initiative/pull/3) | фронт не падает без `GEMINI_API_KEY` | **смержен в `main`** |
 | [#4](https://github.com/trickingegg/lost_initiative/pull/4) | живой `PLAN.md` | **смержен в `main`** |
-| [#5](https://github.com/trickingegg/lost_initiative/pull/5) | этап 2.5: XP, бой, CORS, моки тестов | **смержен в `main`** |
+| [#6](https://github.com/trickingegg/lost_initiative/pull/6) | этап 3A: UI на FastAPI session loop | **открыт** |
 
 ---
 
@@ -153,7 +153,9 @@
 
 ---
 
-## Этап 3A — Играбельный контур ← текущий этап
+## Этап 3A — Играбельный контур
+
+Сделан 2026-08-15, [PR #6](https://github.com/trickingegg/lost_initiative/pull/6) (ждёт merge). Дальше — 3B.
 
 2.5 закрыт. Пишем клиент. Один сценарий, без Zustand «потому что в доке», без переезда каталогов в первом PR.
 
@@ -194,7 +196,7 @@
 - Новые классы/расы
 - Vitest на весь UI — достаточно контрактных тестов API + один ручной прогон сценария выше
 
-Критерий готовности 3A: с ключом на **backend** можно пройти 10–15 ходов без открытия DevTools. Без ключа UI живой и пишет честную ошибку GM.
+Критерий готовности 3A: с ключом на **backend** можно пройти 10–15 ходов без открытия DevTools. Без ключа UI живой и пишет честную ошибку GM. **Проверено вручную 2026-08-15** (fallback-нарратив без ключа, rest/save/load без `alert`).
 
 ---
 
@@ -326,7 +328,7 @@
 ## Порядок следующих PR
 
 1. ~~Backend 2.5: XP/CORS/моки тестов~~ — закрыто, [PR #5](https://github.com/trickingegg/lost_initiative/pull/5).
-2. **Сейчас: фронт 3A** — HTTP-клиент + session-driven `App` + создание персонажа. Прототипный Gemini ещё можно оставить мёртвым кодом до 3C, но не в runtime-пути.
-3. 3B: подсказки, rest, слоты, ошибки, бой.
+2. ~~Фронт 3A: HTTP-клиент + session-driven `App`~~ — сделано, [PR #6](https://github.com/trickingegg/lost_initiative/pull/6).
+3. **Сейчас: 3B** — подсказки, rest, слоты, ошибки, бой.
 4. WS-стриминг нарратива.
 5. 3C: выпилить прототип, перенести `frontend/`.
