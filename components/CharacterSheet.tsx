@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { Character } from '../api/types';
+import type { Character, SpellSlot } from '../api/types';
 import { calculateModifier } from '../utils/dnd';
 import { XP_THRESHOLDS } from '../constants';
 import HealthBar from './HealthBar';
@@ -31,7 +31,7 @@ const CharacterSheet: React.FC<CharacterSheetProps> = ({ character }) => {
         ? `${character.char_class} (${character.subclass})`
         : character.char_class;
 
-    const spellSlotEntries = Object.entries(character.spell_slots || {});
+    const spellSlotEntries: Array<[string, SpellSlot]> = Object.entries(character.spell_slots);
 
     return (
         <div className="flex flex-col h-full text-gray-300 space-y-4">
