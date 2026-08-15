@@ -216,6 +216,18 @@ class PlayerActionRequest(BaseModel):
 class RollResultRequest(BaseModel):
     roll: int
     session_id: str
+    natural: Optional[int] = None  # d20 face, used for crit 1/20 system lines
+
+
+class SaveSlotInfo(BaseModel):
+    slot: int
+    character_name: str
+    turn_count: int
+    saved_at: str
+
+
+class SaveSlotsResponse(BaseModel):
+    slots: List[SaveSlotInfo]
 
 
 class RestRequest(BaseModel):

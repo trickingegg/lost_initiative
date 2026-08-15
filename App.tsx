@@ -10,6 +10,7 @@ import {
   checkHealth,
   createCharacter,
   getSession,
+  listSaves,
   loadSlot,
   postAction,
   postRest,
@@ -18,7 +19,7 @@ import {
   startSession,
 } from './sessionApi/client';
 import { toApiCharacter } from './sessionApi/mappers';
-import { GameSession, GMResponse, StoryTemplate } from './sessionApi/types';
+import { GameSession, GMResponse, SaveSlotInfo, StoryTemplate } from './sessionApi/types';
 
 type Screen = 'menu' | 'settings' | 'setup' | 'creation' | 'game';
 
@@ -61,6 +62,15 @@ function errorMessage(err: unknown): string {
   return 'Unexpected error';
 }
 
+function isGmFailure(gm: GMResponse | null): boolean {
+  return Boolean(gm?.internal_gm_notes?.startsWith('[GM_SERVICE_ERROR]'));
+}
+
+type RetryPayload =
+  | { kind: 'action'; text: string }
+  | { kind: 'roll'; total: number; natural?: number }
+  | { kind: 'rest'; restKind: 'short' | 'long' };
+
 const App: React.FC = () => {
   const [currentScreen, setCurrentScreen] = useState<Screen>('menu');
   const [temperature, setTemperature] = useState<number>(readTemperature);
@@ -75,12 +85,22 @@ const App: React.FC = () => {
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [setting, setSetting] = useState('');
   const [storyTemplate, setStoryTemplate] = useState<StoryTemplate>('dungeon_delve');
+  const [saveSlots, setSaveSlots] = useState<SaveSlotInfo[]>([]);
+  const [retryPayload, setRetryPayload] = useState<RetryPayload | null>(null);
   const allowAutoResume = useRef(true);
 
   const applySession = useCallback((next: GameSession) => {
     setSession(next);
     setSessionId(next.id);
     persistSessionId(next.id);
+  }, []);
+
+  const refreshSaves = useCallback(async (id: string) => {
+    try {
+      setSaveSlots(await listSaves(id));
+    } catch {
+      setSaveSlots([]);
+    }
   }, []);
 
   useEffect(() => {
@@ -114,6 +134,7 @@ const App: React.FC = () => {
         applySession(loaded.session);
         setLastGm(loaded.last_gm_response);
         setCurrentScreen('game');
+        void refreshSaves(loaded.session.id);
       })
       .catch(() => {
         if (cancelled) {
@@ -125,7 +146,15 @@ const App: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [sessionId, session, applySession]);
+  }, [sessionId, session, applySession, refreshSaves]);
+
+  useEffect(() => {
+    if (!sessionId) {
+      setSaveSlots([]);
+      return;
+    }
+    void refreshSaves(sessionId);
+  }, [sessionId, refreshSaves]);
 
   const handleSaveSettings = (nextTemperature: number) => {
     setTemperature(nextTemperature);
@@ -149,9 +178,11 @@ const App: React.FC = () => {
       applySession(started);
       setLastGm(null);
       setCurrentScreen('game');
+      setRetryPayload({ kind: 'action', text: OPENING_ACTION });
       const opening = await postAction(started.id, OPENING_ACTION);
       applySession(opening.session);
       setLastGm(opening.gm_response);
+      await refreshSaves(started.id);
     } catch (err) {
       setError(errorMessage(err));
     } finally {
@@ -166,6 +197,7 @@ const App: React.FC = () => {
     setBusy(true);
     setError(null);
     setStatusMessage(null);
+    setRetryPayload({ kind: 'action', text: action });
     try {
       const result = await postAction(session.id, action);
       applySession(result.session);
@@ -177,15 +209,16 @@ const App: React.FC = () => {
     }
   };
 
-  const handleRollComplete = async (total: number) => {
+  const handleRollComplete = async (total: number, natural?: number) => {
     if (!session) {
       return;
     }
     setBusy(true);
     setError(null);
     setStatusMessage(null);
+    setRetryPayload({ kind: 'roll', total, natural });
     try {
-      const result = await postRoll(session.id, total);
+      const result = await postRoll(session.id, total, natural);
       applySession(result.session);
       setLastGm(result.gm_response);
     } catch (err) {
@@ -195,21 +228,35 @@ const App: React.FC = () => {
     }
   };
 
-  const handleRest = async () => {
+  const handleRest = async (kind: 'short' | 'long') => {
     if (!session) {
       return;
     }
     setBusy(true);
     setError(null);
     setStatusMessage(null);
+    setRetryPayload({ kind: 'rest', restKind: kind });
     try {
-      const result = await postRest(session.id, 'long');
+      const result = await postRest(session.id, kind);
       applySession(result.session);
       setLastGm(result.gm_response);
     } catch (err) {
       setError(errorMessage(err));
     } finally {
       setBusy(false);
+    }
+  };
+
+  const handleRetry = () => {
+    if (!retryPayload) {
+      return;
+    }
+    if (retryPayload.kind === 'action') {
+      void handlePlayerAction(retryPayload.text);
+    } else if (retryPayload.kind === 'roll') {
+      void handleRollComplete(retryPayload.total, retryPayload.natural);
+    } else {
+      void handleRest(retryPayload.restKind);
     }
   };
 
@@ -221,6 +268,7 @@ const App: React.FC = () => {
     setError(null);
     try {
       await saveSlot(session.id, slot);
+      await refreshSaves(session.id);
       setStatusMessage(`Saved to slot ${slot}.`);
     } catch (err) {
       setError(errorMessage(err));
@@ -243,6 +291,7 @@ const App: React.FC = () => {
       setLastGm(null);
       setStatusMessage(`Loaded slot ${slot}.`);
       setCurrentScreen('game');
+      await refreshSaves(id);
     } catch (err) {
       setError(errorMessage(err));
     } finally {
@@ -276,6 +325,7 @@ const App: React.FC = () => {
           canLoad={Boolean(sessionId)}
           backendOk={backendOnline}
           error={error}
+          saveSlots={saveSlots}
         />
       )}
       {currentScreen === 'settings' && (
@@ -304,11 +354,14 @@ const App: React.FC = () => {
           isLoading={busy}
           error={error}
           statusMessage={statusMessage}
+          saveSlots={saveSlots}
+          canRetry={Boolean(retryPayload) && (Boolean(error) || isGmFailure(lastGm))}
           onSendMessage={handlePlayerAction}
           onRoll={handleRollComplete}
           onRest={handleRest}
           onSave={handleSaveSlot}
           onLoad={handleLoadSlot}
+          onRetry={handleRetry}
           onGoToMenu={handleQuitToMenu}
         />
       )}

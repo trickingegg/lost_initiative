@@ -286,6 +286,8 @@ def apply_state_changes(session: GameSession, changes: StateChanges) -> GameSess
         battle_state = BattleState(
             combatants=combatants_pydantic,
             turn_order=turn_order,
+            current_turn_index=0,
+            round_number=1,
         )
 
     if changes.combatant_damage:

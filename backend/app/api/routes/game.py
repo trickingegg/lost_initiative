@@ -10,6 +10,7 @@ from app.db.crud import (
     create_session,
     get_last_gm_response,
     get_session,
+    list_slots,
     load_slot,
     save_slot,
     update_session,
@@ -26,12 +27,30 @@ from app.models.domain import (
     RestRequest,
     RollResultRequest,
     SaveSlotRequest,
+    SaveSlotsResponse,
     SessionResponse,
     StateChanges,
 )
+from app.services.combat_flow import continue_combat
 from app.services.session_service import apply_state_changes, _to_engine_char, _from_engine_char
 
 router = APIRouter(prefix="/session", tags=["session"])
+
+
+async def _apply_gm_turn(
+    db: AsyncSession,
+    original: GameSession,
+    session_with_memory: GameSession,
+    gm_response: GMResponse,
+    extra_messages: list,
+) -> ActionResponse:
+    updated_session = apply_state_changes(session_with_memory, gm_response.state_changes)
+    updated_session = updated_session.model_copy(update={
+        "chat_history": list(original.chat_history) + extra_messages,
+    })
+    updated_session, gm_response = await continue_combat(updated_session, gm_response)
+    await update_session(db, updated_session, gm_response)
+    return ActionResponse(session=updated_session, gm_response=gm_response)
 
 
 @router.post("/start", response_model=SessionResponse)
@@ -60,6 +79,17 @@ async def get_session_state(
     return SessionResponse(session=session, last_gm_response=last_response)
 
 
+@router.get("/{session_id}/saves", response_model=SaveSlotsResponse)
+async def list_save_slots(
+    session_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> SaveSlotsResponse:
+    session = await get_session(db, session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return SaveSlotsResponse(slots=await list_slots(db, session_id))
+
+
 @router.post("/{session_id}/action", response_model=ActionResponse)
 async def player_action(
     session_id: str,
@@ -74,17 +104,16 @@ async def player_action(
     from app.ai_gm.gm_service import process_action
 
     gm_response, session_with_memory = await process_action(session, request.action)
-
-    updated_session = apply_state_changes(session_with_memory, gm_response.state_changes)
-    updated_session = updated_session.model_copy(update={
-        "chat_history": list(session.chat_history) + [
+    return await _apply_gm_turn(
+        db,
+        session,
+        session_with_memory,
+        gm_response,
+        [
             ChatMessage(role="player", content=request.action),
             ChatMessage(role="gm", content=gm_response.narrative),
-        ]
-    })
-
-    await update_session(db, updated_session, gm_response)
-    return ActionResponse(session=updated_session, gm_response=gm_response)
+        ],
+    )
 
 
 @router.post("/{session_id}/roll", response_model=ActionResponse)
@@ -101,17 +130,13 @@ async def submit_roll(
     from app.ai_gm.gm_service import process_roll_result
 
     gm_response, session_with_memory = await process_roll_result(session, request.roll)
-
-    updated_session = apply_state_changes(session_with_memory, gm_response.state_changes)
-    updated_session = updated_session.model_copy(update={
-        "chat_history": list(session.chat_history) + [
-            ChatMessage(role="system", content=f"[Roll: {request.roll}]"),
-            ChatMessage(role="gm", content=gm_response.narrative),
-        ]
-    })
-
-    await update_session(db, updated_session, gm_response)
-    return ActionResponse(session=updated_session, gm_response=gm_response)
+    extra = [ChatMessage(role="system", content=f"[Roll: {request.roll}]")]
+    if request.natural == 20:
+        extra.append(ChatMessage(role="system", content="[Natural 20]"))
+    elif request.natural == 1:
+        extra.append(ChatMessage(role="system", content="[Natural 1]"))
+    extra.append(ChatMessage(role="gm", content=gm_response.narrative))
+    return await _apply_gm_turn(db, session, session_with_memory, gm_response, extra)
 
 
 @router.post("/{session_id}/rest", response_model=ActionResponse)
@@ -163,7 +188,12 @@ async def save_game(
     if session is None:
         raise HTTPException(status_code=404, detail="Session not found")
     await save_slot(db, session_id, request.slot, session)
-    return {"saved": True, "slot": request.slot}
+    return {
+        "saved": True,
+        "slot": request.slot,
+        "character_name": session.character.name,
+        "turn_count": session.turn_count,
+    }
 
 
 @router.post("/{session_id}/load", response_model=SessionResponse)

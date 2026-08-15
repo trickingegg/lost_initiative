@@ -4,14 +4,14 @@ All functions are async, accept an SQLAlchemy AsyncSession.
 """
 from __future__ import annotations
 
-import json
-from typing import Optional
+from datetime import datetime, timezone
+from typing import List, Optional
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import GameSessionRecord, SaveSlotRecord
-from app.models.domain import GameSession, GMResponse
+from app.models.domain import GameSession, GMResponse, SaveSlotInfo
 
 
 async def create_session(db: AsyncSession, session: GameSession) -> GameSession:
@@ -78,15 +78,18 @@ async def save_slot(
     )
     record = result.scalar_one_or_none()
 
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     if record is None:
         record = SaveSlotRecord(
             session_id=session_id,
             slot=slot,
             data=session.model_dump_json(),
+            saved_at=now,
         )
         db.add(record)
     else:
         record.data = session.model_dump_json()
+        record.saved_at = now
 
     await db.commit()
 
@@ -104,3 +107,22 @@ async def load_slot(
     if record is None:
         return None
     return GameSession.model_validate_json(record.data)
+
+
+async def list_slots(db: AsyncSession, session_id: str) -> List[SaveSlotInfo]:
+    result = await db.execute(
+        select(SaveSlotRecord)
+        .where(SaveSlotRecord.session_id == session_id)
+        .order_by(SaveSlotRecord.slot)
+    )
+    infos: List[SaveSlotInfo] = []
+    for record in result.scalars().all():
+        session = GameSession.model_validate_json(record.data)
+        saved_at = record.saved_at.isoformat() if record.saved_at else ""
+        infos.append(SaveSlotInfo(
+            slot=record.slot,
+            character_name=session.character.name,
+            turn_count=session.turn_count,
+            saved_at=saved_at,
+        ))
+    return infos

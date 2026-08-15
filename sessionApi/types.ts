@@ -158,6 +158,13 @@ export interface ActionResponse {
     gm_response: GMResponse;
 }
 
+export interface SaveSlotInfo {
+    slot: number;
+    character_name: string;
+    turn_count: number;
+    saved_at: string;
+}
+
 export const STORY_TEMPLATES: { id: StoryTemplate; label: string; description: string }[] = [
     { id: 'dungeon_delve', label: 'Dungeon Delve', description: 'A dungeon with a clear objective, traps, and a boss.' },
     { id: 'three_act', label: 'Three-Act Story', description: 'Setup, confrontation, and a climactic resolution.' },
