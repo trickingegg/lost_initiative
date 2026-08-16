@@ -11,6 +11,21 @@ node_modules
 dist
 dist-ssr
 *.local
+.vite
+
+# Python
+backend/.venv
+.venv
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+
+# Secrets and local DB
+.env
+backend/.env
+*.db
+game.db
 
 # Editor directories and files
 .vscode/*

@@ -1,5 +1,5 @@
 import React from 'react';
-import type { SaveSlotInfo } from '../sessionApi/types';
+import type { SaveSlotInfo } from '../api/types';
 
 interface MainMenuScreenProps {
     onNewGame: () => void;

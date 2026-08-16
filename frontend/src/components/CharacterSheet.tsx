@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { Character, SpellSlot } from '../sessionApi/types';
+import type { Character, SpellSlot } from '../api/types';
 import { calculateModifier } from '../utils/dnd';
 import { XP_THRESHOLDS } from '../constants';
 import HealthBar from './HealthBar';

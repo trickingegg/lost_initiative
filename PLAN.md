@@ -1,7 +1,7 @@
 # План доработки — DnD AI Game Master
 
 Живой трекер. Контракт архитектуры — [`ARCHITECTURE.md`](./ARCHITECTURE.md).  
-Статус сверен с кодом **2026-08-15**. После каждого закрытого шага обновлять этот файл: чекбокс + дата + PR.
+Статус сверен с кодом **2026-08-16**. После каждого закрытого шага обновлять этот файл: чекбокс + дата + PR.
 
 Как отмечать:
 
@@ -16,17 +16,17 @@
 ## Сейчас
 
 - **Этап 3A закрыт** (2026-08-15, [PR #6](https://github.com/trickingegg/lost_initiative/pull/6) смержен). UI на FastAPI.
-- **Этап 3B сделан** (2026-08-15, [PR #7](https://github.com/trickingegg/lost_initiative/pull/7), ждёт merge). Retry, typewriter, NPC-ход на сервере, слоты с датой, README. `pytest` 278. Ручной прогон: rest/save/overwrite/load без `alert()`.
-- **После merge — этап 3C**: выпилить браузерный Gemini, regex, перенос `frontend/`.
-- Не начинать 3C/4/5, пока 3B не закрыт ручным прогоном боя и отдыха.
+- **Этап 3B закрыт** (2026-08-15, [PR #7](https://github.com/trickingegg/lost_initiative/pull/7) смержен, `5695a80`). Retry, typewriter, NPC-ход на сервере, слоты с датой, README. `pytest` 278.
+- **Этап 3C в этом PR**: клиент в `frontend/`, удалены браузерный Gemini и regex. Без Zustand, без порта `constants.ts`, Tailwind остаётся CDN.
+- Этап 4 — после merge 3C.
 
 ---
 
 ## Зачем этот документ
 
-Сейчас в репозитории **два несклеенных продукта**:
+Сейчас в репозитории **один игровой контур** (UI → FastAPI session loop). Исторически это были два несклеенных продукта:
 
-1. Браузерный прототип (React в корне): сам ходит в Gemini, сам парсит `[DAMAGE:5]`, сейв в `localStorage`.
+1. Браузерный прототип (React в корне): сам ходил в Gemini, парсил `[DAMAGE:5]`, сейв в `localStorage`. Выпилен в 3C.
 2. Backend Stages 1–2 (FastAPI): правила, сессия, SQLite, structured GM JSON.
 
 Цель плана — довести это до **одной играбельной игры**, где:
@@ -63,9 +63,9 @@
 | 2. AI GM | structured output, память, `/action`, провайдеры | **сделан, с дырами** |
 | 2.5 Backend hardening | баги, из-за которых игра врёт или не клеится с UI | **закрыт (2026-08-15, PR #5)** |
 | 3A. Играбельный контур | фронт ходит в FastAPI, один полный ход | **закрыт (PR #6)** |
-| 3B. Приятно играть | подсказки, броски, rest, сейвы, ошибки, стрим | **сделан, PR #7** |
-| 3C. Убрать прототип | выкинуть Gemini-в-браузере, regex, god-`App.tsx` | **не начат** |
-| 4. Полная механика | death saves UI, conditions, классы этапа 2, AC | **не начинать до 3B** |
+| 3B. Приятно играть | подсказки, броски, rest, сейвы, ошибки, стрим | **закрыт (PR #7)** |
+| 3C. Убрать прототип | выкинуть Gemini-в-браузере, regex, перенос `frontend/` | **в этом PR** |
+| 4. Полная механика | death saves UI, conditions, классы этапа 2, AC | **не начинать до merge 3C** |
 | 5. Голос | STT/TTS | **не начинать до стабильного текста** |
 
 Отдельно (не этап архитектуры, но уже в работе):
@@ -75,7 +75,7 @@
 | [#3](https://github.com/trickingegg/lost_initiative/pull/3) | фронт не падает без `GEMINI_API_KEY` | **смержен в `main`** |
 | [#4](https://github.com/trickingegg/lost_initiative/pull/4) | живой `PLAN.md` | **смержен в `main`** |
 | [#6](https://github.com/trickingegg/lost_initiative/pull/6) | этап 3A: UI на FastAPI session loop | **смержен в `main`** |
-| [#7](https://github.com/trickingegg/lost_initiative/pull/7) | этап 3B: бой, retry, слоты, README | **открыт** |
+| [#7](https://github.com/trickingegg/lost_initiative/pull/7) | этап 3B: бой, retry, слоты, README | **смержен в `main`** |
 
 ---
 
@@ -173,9 +173,9 @@
 
 ### Клиентский каркас
 
-- [x] HTTP-клиент (`sessionApi/client.ts`): start / get / action / roll / rest / save / load
+- [x] HTTP-клиент (`frontend/src/api/client.ts`, раньше `sessionApi/`): start / get / action / roll / rest / save / load
 - [x] Типы фронта = зеркало Pydantic (`hp_current`, `char_class`, `role`/`content`). Старый `types.ts` только для формы создания
-- [x] Маппер creation-формы → `CreateSessionRequest` (`sessionApi/mappers.ts`)
+- [x] Маппер creation-формы → `CreateSessionRequest` (`frontend/src/api/mappers.ts`)
 - [x] Ключ Gemini **убрать** из `vite.config.ts` `define`; proxy `/health` + `/api` + `/ws`
 - [x] Экран «backend недоступен» на меню, без чёрного экрана
 - [x] `App.tsx` больше не вызывает `getGameMasterResponse` и не гоняет `commandProcessor`
@@ -202,7 +202,7 @@
 
 ---
 
-## Этап 3B — Приятно играть ← текущий этап
+## Этап 3B — Приятно играть
 
 Полировка контура, не новая механика D&D.
 
@@ -233,17 +233,17 @@
 
 ---
 
-## Этап 3C — Убрать прототипную механику
+## Этап 3C — Убрать прототипную механику ← текущий этап
 
 Когда 3A+3B живут на API:
 
-- [ ] Удалить `services/geminiService.ts` из игрового пути (или весь файл)
-- [ ] Удалить `utils/commandProcessor.ts`
-- [ ] Разобрать god-`App.tsx`: экраны + session store, без боевого FSM и regex
-- [ ] Перенести клиент в `frontend/` как в архитектуре (один PR, без смены поведения)
-- [ ] Tailwind: убрать CDN, собрать как PostCSS (или оставить CDN до отдельного PR, но не оба способа)
+- [x] Удалить `services/geminiService.ts` из игрового пути (или весь файл)
+- [x] Удалить `utils/commandProcessor.ts`
+- [x] `App.tsx` — session-driven оркестратор экранов (3A/3B), без боевого FSM и regex. Zustand — отдельным PR, не здесь
+- [x] Перенести клиент в `frontend/` как в архитектуре (один PR, без смены поведения). HTTP-клиент: `frontend/src/api/`
+- [ ] Tailwind: убрать CDN, собрать как PostCSS (оставить CDN до отдельного PR)
 - [ ] Портировать нужные куски `constants.ts` в Python, чтобы `/api/character/*` отдавал классы/расы/заклинания, а фронт не держал вторую таблицу правды
-- [ ] `.gitignore`: `.venv`, корневой `.env`
+- [x] `.gitignore`: `.venv`, `.env`, `*.db`
 
 ---
 
@@ -278,10 +278,10 @@
 
 | Оставить | Путь | Как |
 |---|---|---|
-| Экраны UI | `components/*.tsx` | Подключить к session API |
-| Идеи промпта | `services/geminiService.ts` | Уже частично в `prompts.py` |
-| Таблицы классов/рас/заклинаний | `constants.ts` | Порт в Python на 3C |
-| Формулы как референс | `utils/dnd.ts` | Сверять с `game_engine`, не держать вторую реализацию |
+| Экраны UI | `frontend/src/components/*.tsx` | Подключены к session API |
+| Идеи промпта | `services/geminiService.ts` | Файл удалён в 3C; идеи уже в `prompts.py` |
+| Таблицы классов/рас/заклинаний | `frontend/src/constants.ts` | Порт в Python — отдельным PR после 3C |
+| Формулы как референс | `frontend/src/utils/dnd.ts` | Сверять с `game_engine`, не держать вторую реализацию |
 
 Выбросить, не «рефакторить»:
 
@@ -331,5 +331,5 @@
 
 1. ~~Backend 2.5: XP/CORS/моки тестов~~ — закрыто, [PR #5](https://github.com/trickingegg/lost_initiative/pull/5).
 2. ~~Фронт 3A: HTTP-клиент + session-driven `App`~~ — смержен, [PR #6](https://github.com/trickingegg/lost_initiative/pull/6).
-3. ~~3B: retry, бой/NPC, слоты, typewriter, README~~ — сделано, [PR #7](https://github.com/trickingegg/lost_initiative/pull/7).
-4. **Сейчас после merge: 3C** — выпилить прототип, перенести `frontend/`.
+3. ~~3B: retry, бой/NPC, слоты, typewriter, README~~ — смержен, [PR #7](https://github.com/trickingegg/lost_initiative/pull/7).
+4. **Сейчас: 3C** — выпилить прототип, перенести `frontend/` (этот PR). Zustand / порт `constants.ts` / Tailwind PostCSS — не в этом PR.
