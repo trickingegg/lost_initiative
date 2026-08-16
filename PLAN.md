@@ -17,7 +17,7 @@
 
 - **Этап 3A закрыт** (2026-08-15, [PR #6](https://github.com/trickingegg/lost_initiative/pull/6) смержен). UI на FastAPI.
 - **Этап 3B закрыт** (2026-08-15, [PR #7](https://github.com/trickingegg/lost_initiative/pull/7) смержен, `5695a80`). Retry, typewriter, NPC-ход на сервере, слоты с датой, README. `pytest` 278.
-- **Этап 3C в этом PR**: клиент в `frontend/`, удалены браузерный Gemini и regex. Без Zustand, без порта `constants.ts`, Tailwind остаётся CDN.
+- **Этап 3C в [PR #8](https://github.com/trickingegg/lost_initiative/pull/8)**: клиент в `frontend/`, удалены браузерный Gemini и regex. Без Zustand, без порта `constants.ts`, Tailwind остаётся CDN. `tsc` ок, `pytest` 278, UI-меню не чёрный экран.
 - Этап 4 — после merge 3C.
 
 ---
@@ -76,6 +76,7 @@
 | [#4](https://github.com/trickingegg/lost_initiative/pull/4) | живой `PLAN.md` | **смержен в `main`** |
 | [#6](https://github.com/trickingegg/lost_initiative/pull/6) | этап 3A: UI на FastAPI session loop | **смержен в `main`** |
 | [#7](https://github.com/trickingegg/lost_initiative/pull/7) | этап 3B: бой, retry, слоты, README | **смержен в `main`** |
+| [#8](https://github.com/trickingegg/lost_initiative/pull/8) | этап 3C: `frontend/`, выпил прототипа | **открыт** |
 
 ---
 
@@ -332,4 +333,4 @@
 1. ~~Backend 2.5: XP/CORS/моки тестов~~ — закрыто, [PR #5](https://github.com/trickingegg/lost_initiative/pull/5).
 2. ~~Фронт 3A: HTTP-клиент + session-driven `App`~~ — смержен, [PR #6](https://github.com/trickingegg/lost_initiative/pull/6).
 3. ~~3B: retry, бой/NPC, слоты, typewriter, README~~ — смержен, [PR #7](https://github.com/trickingegg/lost_initiative/pull/7).
-4. **Сейчас: 3C** — выпилить прототип, перенести `frontend/` (этот PR). Zustand / порт `constants.ts` / Tailwind PostCSS — не в этом PR.
+4. **Сейчас: 3C** — [PR #8](https://github.com/trickingegg/lost_initiative/pull/8). Zustand / порт `constants.ts` / Tailwind PostCSS — не в этом PR.
