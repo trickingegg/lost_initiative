@@ -15,9 +15,10 @@
 
 ## Сейчас
 
-- **Этап 3A сделан** (2026-08-15, [PR #6](https://github.com/trickingegg/lost_initiative/pull/6), ждёт merge). UI ходит в FastAPI: setup + story template, create → start → opening action, лист с сервера, save/load. Без ключа GM отдаёт fallback, UI не падает. `pytest` 266, `tsc --noEmit` зелёный.
-- **После merge — этап 3B**: подсказки, rest UX, ошибки/retry, бой, нормальный стрим нарратива.
-- Не начинать 3C/4/5, пока 3B не закрыт.
+- **Этап 3A закрыт** (2026-08-15, [PR #6](https://github.com/trickingegg/lost_initiative/pull/6) смержен). UI на FastAPI.
+- **Этап 3B сделан** (2026-08-15, [PR #7](https://github.com/trickingegg/lost_initiative/pull/7), ждёт merge). Retry, typewriter, NPC-ход на сервере, слоты с датой, README. `pytest` 278. Ручной прогон: rest/save/overwrite/load без `alert()`.
+- **После merge — этап 3C**: выпилить браузерный Gemini, regex, перенос `frontend/`.
+- Не начинать 3C/4/5, пока 3B не закрыт ручным прогоном боя и отдыха.
 
 ---
 
@@ -61,8 +62,8 @@
 | 1. Backend Core | движок, модели, SQLite, HTTP сессии | **сделан** |
 | 2. AI GM | structured output, память, `/action`, провайдеры | **сделан, с дырами** |
 | 2.5 Backend hardening | баги, из-за которых игра врёт или не клеится с UI | **закрыт (2026-08-15, PR #5)** |
-| 3A. Играбельный контур | фронт ходит в FastAPI, один полный ход | **сделан, PR #6** |
-| 3B. Приятно играть | подсказки, броски, rest, сейвы, ошибки, стрим | **следующий** |
+| 3A. Играбельный контур | фронт ходит в FastAPI, один полный ход | **закрыт (PR #6)** |
+| 3B. Приятно играть | подсказки, броски, rest, сейвы, ошибки, стрим | **сделан, PR #7** |
 | 3C. Убрать прототип | выкинуть Gemini-в-браузере, regex, god-`App.tsx` | **не начат** |
 | 4. Полная механика | death saves UI, conditions, классы этапа 2, AC | **не начинать до 3B** |
 | 5. Голос | STT/TTS | **не начинать до стабильного текста** |
@@ -73,7 +74,8 @@
 |---|---|---|
 | [#3](https://github.com/trickingegg/lost_initiative/pull/3) | фронт не падает без `GEMINI_API_KEY` | **смержен в `main`** |
 | [#4](https://github.com/trickingegg/lost_initiative/pull/4) | живой `PLAN.md` | **смержен в `main`** |
-| [#6](https://github.com/trickingegg/lost_initiative/pull/6) | этап 3A: UI на FastAPI session loop | **открыт** |
+| [#6](https://github.com/trickingegg/lost_initiative/pull/6) | этап 3A: UI на FastAPI session loop | **смержен в `main`** |
+| [#7](https://github.com/trickingegg/lost_initiative/pull/7) | этап 3B: бой, retry, слоты, README | **открыт** |
 
 ---
 
@@ -155,7 +157,7 @@
 
 ## Этап 3A — Играбельный контур
 
-Сделан 2026-08-15, [PR #6](https://github.com/trickingegg/lost_initiative/pull/6) (ждёт merge). Дальше — 3B.
+Сделан 2026-08-15, [PR #6](https://github.com/trickingegg/lost_initiative/pull/6) смержен. Дальше — 3B.
 
 2.5 закрыт. Пишем клиент. Один сценарий, без Zustand «потому что в доке», без переезда каталогов в первом PR.
 
@@ -200,34 +202,34 @@
 
 ---
 
-## Этап 3B — Приятно играть
+## Этап 3B — Приятно играть ← текущий этап
 
 Полировка контура, не новая механика D&D.
 
-- [ ] `suggested_actions` кликабельны под полем ввода
-- [ ] Печать нарратива: либо HTTP + посимвольный reveal, либо **нормальный** WS (стримить `narrative`, не JSON)
-- [ ] Индикатор «GM думает» без блокировки всего экрана навечно; кнопка Retry
-- [ ] Бросок: анимация уже есть; добавить proficiency на skill check; crit 1/20 как system-line
-- [ ] Боевой трекер читает `session.battle_state` (ход, HP врагов)
-- [ ] Ход врага не отдельным браузерным `useEffect` в Gemini, а серверным правилом: либо клиент шлёт `It is the goblin's turn`, либо backend сам резолвит NPC-ход после `/roll`
-- [ ] Три слота сохранения с датой и именем персонажа, confirm перед затиранием
-- [ ] Conditions и death saves хотя бы как текст на листе (полный UI — этап 4)
-- [ ] Убрать `alert()`: save/load/ошибки — тост или inline
-- [ ] Мобильная вёрстка: поле ввода не уезжает, лист сворачивается
-- [ ] README: как поднять backend + frontend + `.env`
+- [x] `suggested_actions` кликабельны под полем ввода
+- [x] Печать нарратива: HTTP + посимвольный reveal. Клиент **не** подписан на WS
+- [x] Индикатор «GM думает» в логе; кнопка Retry; таймаут fetch 90s
+- [x] Бросок: proficiency на skill check и attack; crit 1/20 как system-line
+- [x] Боевой трекер читает `session.battle_state` (раунд, чей ход, HP врагов)
+- [x] Ход врага резолвит backend (`continue_combat`, кап 4 NPC за запрос)
+- [x] Три слота: имя, ход, дата; confirm перед затиранием; `GET /saves`
+- [x] Conditions и death saves текстом на листе (полный UI — этап 4)
+- [x] Убрать `alert()`: save/load/ошибки — inline
+- [x] Мобильная вёрстка: поле ввода прибито снизу, лист сворачивается
+- [x] README: как поднять backend + frontend + `.env`
 
-Критерий готовности 3B: посторонний человек с ключом проходит бой и отдых, не читая этот файл.
+Критерий готовности 3B: посторонний человек с ключом проходит бой и отдых, не читая этот файл. **Проверено вручную 2026-08-15** (без ключа: fallback + Retry, rest, save/overwrite/load). Бой с живым GM — с ключом на backend; NPC-ход покрыт тестами.
 
 ### WebSocket — отдельным шагом внутри 3B
 
-Текущий `/ws/session/{id}/stream` **не использовать как есть**. Сначала:
+Клиент 3B играет через HTTP. Протокол WS приведён к контракту, но UI на него не переключён.
 
-- [ ] Стримить только поле `narrative` (или копить JSON молча и пушить `chunk` уже из `narrative`)
-- [ ] После полного JSON — те же `state_changes` / `done`, что и HTTP
-- [ ] Retry как в `gm_service` (сейчас у WS его нет)
-- [ ] Тест на протокол WS
+- [x] Стримить только поле `narrative` (JSON провайдера копится на сервере)
+- [x] После полного ответа — те же `state_changes` / `suggested_actions` / `done`, что и HTTP
+- [x] Retry как в `gm_service` (WS вызывает `process_action`)
+- [x] Тест на протокол WS (`tests/test_ws.py`)
 
-Пока это не готово, клиент играет через HTTP. Два транспорта в UI одновременно не плодить.
+Пока UI на HTTP. Два транспорта в клиенте одновременно не плодить.
 
 ---
 
@@ -328,7 +330,6 @@
 ## Порядок следующих PR
 
 1. ~~Backend 2.5: XP/CORS/моки тестов~~ — закрыто, [PR #5](https://github.com/trickingegg/lost_initiative/pull/5).
-2. ~~Фронт 3A: HTTP-клиент + session-driven `App`~~ — сделано, [PR #6](https://github.com/trickingegg/lost_initiative/pull/6).
-3. **Сейчас: 3B** — подсказки, rest, слоты, ошибки, бой.
-4. WS-стриминг нарратива.
-5. 3C: выпилить прототип, перенести `frontend/`.
+2. ~~Фронт 3A: HTTP-клиент + session-driven `App`~~ — смержен, [PR #6](https://github.com/trickingegg/lost_initiative/pull/6).
+3. ~~3B: retry, бой/NPC, слоты, typewriter, README~~ — сделано, [PR #7](https://github.com/trickingegg/lost_initiative/pull/7).
+4. **Сейчас после merge: 3C** — выпилить прототип, перенести `frontend/`.

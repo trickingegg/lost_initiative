@@ -42,6 +42,11 @@ const CharacterSheet: React.FC<CharacterSheetProps> = ({ character }) => {
                 {character.conditions.length > 0 && (
                     <p className="text-xs text-amber-400 mt-1">Conditions: {character.conditions.join(', ')}</p>
                 )}
+                {character.hp_current <= 0 && (
+                    <p className="text-xs text-red-300 mt-1">
+                        Death saves: {character.death_saves.successes} success / {character.death_saves.failures} failure
+                    </p>
+                )}
             </div>
 
             <HealthBar current={character.hp_current} max={character.hp_max} />

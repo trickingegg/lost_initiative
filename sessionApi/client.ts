@@ -2,6 +2,7 @@ import {
     ActionResponse,
     Character,
     GameSession,
+    SaveSlotInfo,
     SessionResponse,
     StoryTemplate,
 } from './types';
@@ -32,17 +33,30 @@ async function readError(response: Response): Promise<string> {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-    const response = await fetch(path, {
-        ...init,
-        headers: {
-            'Content-Type': 'application/json',
-            ...(init?.headers || {}),
-        },
-    });
-    if (!response.ok) {
-        throw new ApiError(response.status, await readError(response));
+    const controller = new AbortController();
+    const timeoutMs = 90000;
+    const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+    try {
+        const response = await fetch(path, {
+            ...init,
+            signal: controller.signal,
+            headers: {
+                'Content-Type': 'application/json',
+                ...(init?.headers || {}),
+            },
+        });
+        if (!response.ok) {
+            throw new ApiError(response.status, await readError(response));
+        }
+        return response.json() as Promise<T>;
+    } catch (err) {
+        if (err instanceof DOMException && err.name === 'AbortError') {
+            throw new ApiError(408, 'The Game Master took too long to respond. Retry the action.');
+        }
+        throw err;
+    } finally {
+        window.clearTimeout(timer);
     }
-    return response.json() as Promise<T>;
 }
 
 export async function checkHealth(): Promise<boolean> {
@@ -92,10 +106,14 @@ export async function postAction(sessionId: string, action: string): Promise<Act
     });
 }
 
-export async function postRoll(sessionId: string, roll: number): Promise<ActionResponse> {
+export async function postRoll(
+    sessionId: string,
+    roll: number,
+    natural?: number,
+): Promise<ActionResponse> {
     return request<ActionResponse>(`/api/session/${sessionId}/roll`, {
         method: 'POST',
-        body: JSON.stringify({ roll, session_id: sessionId }),
+        body: JSON.stringify({ roll, session_id: sessionId, natural }),
     });
 }
 
@@ -110,11 +128,25 @@ export async function postRest(
     });
 }
 
-export async function saveSlot(sessionId: string, slot: number): Promise<void> {
-    await request(`/api/session/${sessionId}/save`, {
-        method: 'POST',
-        body: JSON.stringify({ slot }),
-    });
+export async function saveSlot(sessionId: string, slot: number): Promise<SaveSlotInfo> {
+    const body = await request<{ saved: boolean; slot: number; character_name: string; turn_count: number }>(
+        `/api/session/${sessionId}/save`,
+        {
+            method: 'POST',
+            body: JSON.stringify({ slot }),
+        },
+    );
+    return {
+        slot: body.slot,
+        character_name: body.character_name,
+        turn_count: body.turn_count,
+        saved_at: new Date().toISOString(),
+    };
+}
+
+export async function listSaves(sessionId: string): Promise<SaveSlotInfo[]> {
+    const body = await request<{ slots: SaveSlotInfo[] }>(`/api/session/${sessionId}/saves`);
+    return body.slots;
 }
 
 export async function loadSlot(sessionId: string, slot: number): Promise<GameSession> {

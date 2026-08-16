@@ -1,4 +1,5 @@
 import React from 'react';
+import type { SaveSlotInfo } from '../sessionApi/types';
 
 interface MainMenuScreenProps {
     onNewGame: () => void;
@@ -7,10 +8,11 @@ interface MainMenuScreenProps {
     canLoad: boolean;
     backendOk: boolean | null;
     error?: string | null;
+    saveSlots?: SaveSlotInfo[];
 }
 
 const MainMenuScreen: React.FC<MainMenuScreenProps> = ({
-    onNewGame, onLoadSlot, onSettings, canLoad, backendOk, error,
+    onNewGame, onLoadSlot, onSettings, canLoad, backendOk, error, saveSlots = [],
 }) => {
     return (
         <div className="min-h-screen bg-gray-900 text-gray-200 flex items-center justify-center p-4 font-sans">
@@ -31,16 +33,28 @@ const MainMenuScreen: React.FC<MainMenuScreenProps> = ({
                     <div>
                         <p className="text-sm text-gray-500 mb-2">Load Game</p>
                         <div className="grid grid-cols-3 gap-2">
-                            {[1, 2, 3].map((slot) => (
-                                <button
-                                    key={slot}
-                                    onClick={() => onLoadSlot(slot)}
-                                    disabled={!canLoad}
-                                    className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-2 rounded-md transition duration-200 disabled:bg-gray-600 disabled:cursor-not-allowed"
-                                >
-                                    Slot {slot}
-                                </button>
-                            ))}
+                            {[1, 2, 3].map((slot) => {
+                                const info = saveSlots.find((item) => item.slot === slot);
+                                return (
+                                    <button
+                                        key={slot}
+                                        onClick={() => onLoadSlot(slot)}
+                                        disabled={!canLoad || !info}
+                                        className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-2 rounded-md transition duration-200 disabled:bg-gray-600 disabled:cursor-not-allowed text-sm"
+                                    >
+                                        <div>Slot {slot}</div>
+                                        {info ? (
+                                            <div className="text-[10px] font-normal text-blue-100 mt-1 leading-tight">
+                                                {info.character_name}
+                                                <br />
+                                                turn {info.turn_count}
+                                            </div>
+                                        ) : (
+                                            <div className="text-[10px] font-normal text-gray-400 mt-1">empty</div>
+                                        )}
+                                    </button>
+                                );
+                            })}
                         </div>
                     </div>
                     <button

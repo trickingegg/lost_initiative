@@ -194,6 +194,62 @@ class TestSessionLifecycle:
         assert "player" in battle["turn_order"]
         assert len(battle["turn_order"]) == len(battle["combatants"])
         assert {c["id"] for c in battle["combatants"]} == set(battle["turn_order"])
+        assert battle["round_number"] >= 1
+
+    @pytest.mark.asyncio
+    async def test_npc_turn_resolves_when_enemy_wins_initiative(self, client: AsyncClient):
+        from app.game_engine.combat import Combatant as EngineCombatant
+
+        def fake_roll(combatants):
+            rolled = []
+            for row in combatants:
+                rolled.append(EngineCombatant(
+                    id=row["id"],
+                    name=row["name"],
+                    initiative=20 if not row.get("is_player") else 1,
+                    hp_current=row.get("hp_current", row.get("hp", 7)),
+                    hp_max=row.get("hp_max", row.get("hp", 7)),
+                    ac=row.get("ac", 15),
+                    is_player=row.get("is_player", False),
+                ))
+            rolled.sort(key=lambda item: item.initiative, reverse=True)
+            return rolled
+
+        create_resp = await client.post("/api/session/start", json=SESSION_PAYLOAD)
+        session_id = create_resp.json()["session"]["id"]
+        player_gm = _gm(
+            "Goblins leap from the brush!",
+            start_battle=[{
+                "id": "goblin_1",
+                "name": "Goblin",
+                "hp": 7,
+                "ac": 15,
+                "initiative_bonus": 2,
+                "cr": 0.25,
+            }],
+        )
+        npc_gm = _gm("The goblin slashes you.", damage=4)
+
+        async def fake(session, action):
+            if "Goblin" in action:
+                return npc_gm, session
+            return player_gm, session
+
+        with patch("app.ai_gm.gm_service.process_action", new=AsyncMock(side_effect=fake)), patch(
+            "app.services.session_service.combat_engine.roll_initiative", fake_roll
+        ):
+            action_resp = await client.post(
+                f"/api/session/{session_id}/action",
+                json={"action": "I step into the clearing.", "session_id": session_id},
+            )
+
+        assert action_resp.status_code == 200
+        data = action_resp.json()
+        assert data["session"]["character"]["hp_current"] == 14
+        assert any(msg["content"] == "[Turn: Goblin]" for msg in data["session"]["chat_history"])
+        battle = data["session"]["battle_state"]
+        current_id = battle["turn_order"][battle["current_turn_index"]]
+        assert current_id == "player"
 
     @pytest.mark.asyncio
     async def test_long_rest_via_gm_state_changes(self, client: AsyncClient):
@@ -224,13 +280,15 @@ class TestSessionLifecycle:
         with _patch_roll(_gm("The lock clicks open.")):
             roll_resp = await client.post(
                 f"/api/session/{session_id}/roll",
-                json={"roll": 17, "session_id": session_id},
+                json={"roll": 17, "session_id": session_id, "natural": 20},
             )
 
         assert roll_resp.status_code == 200
         data = roll_resp.json()
         assert data["gm_response"]["narrative"] == "The lock clicks open."
         assert data["session"]["turn_count"] == 1
+        roles = [m["content"] for m in data["session"]["chat_history"] if m["role"] == "system"]
+        assert any("[Natural 20]" in line for line in roles)
 
     @pytest.mark.asyncio
     async def test_long_rest_restores_hp(self, client: AsyncClient):
@@ -270,6 +328,14 @@ class TestSessionLifecycle:
         )
         assert load_resp.status_code == 200
         assert load_resp.json()["session"]["character"]["name"] == "Aria"
+
+        listed = await client.get(f"/api/session/{session_id}/saves")
+        assert listed.status_code == 200
+        slots = listed.json()["slots"]
+        assert len(slots) == 1
+        assert slots[0]["slot"] == 1
+        assert slots[0]["character_name"] == "Aria"
+        assert slots[0]["saved_at"]
 
     @pytest.mark.asyncio
     async def test_load_empty_slot_returns_404(self, client: AsyncClient):
