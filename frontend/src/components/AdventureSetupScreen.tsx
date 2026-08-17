@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { STORY_TEMPLATES, type StoryTemplate } from '../sessionApi/types';
+import { STORY_TEMPLATES, type StoryTemplate } from '../api/types';
 
 interface AdventureSetupScreenProps {
     onSetupComplete: (setting: string, storyTemplate: StoryTemplate) => void;

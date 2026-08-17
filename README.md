@@ -2,6 +2,8 @@
 
 Текстовая D&D 5e с ИИ-мастером. **Правила считает backend** (`backend/app/game_engine`). AI только описывает уже посчитанный факт. Ключ провайдера живёт только в `backend/.env`, во фронт не попадает.
 
+Клиент — React/Vite в каталоге `frontend/`.
+
 ## Что нужно
 
 - Python 3.11+
@@ -19,7 +21,8 @@ pip install -r requirements.txt
 cp .env.example .env        # впишите GEMINI_API_KEY или смените AI_PROVIDER
 uvicorn app.main:app --reload --port 8000
 
-# 2. Frontend (другой терминал, корень репозитория)
+# 2. Frontend (другой терминал)
+cd frontend
 npm install
 npm run dev                 # Vite: http://localhost:3000
 ```

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import type { Character, RollRequest } from '../sessionApi/types';
-import { rollModifier } from '../sessionApi/mappers';
+import type { Character, RollRequest } from '../api/types';
+import { rollModifier } from '../api/mappers';
 
 interface DiceRollPromptProps {
     character: Character;

@@ -287,14 +287,16 @@ Story templates: `three_act`, `hex_crawl`, `dungeon_delve`, `political_intrigue`
 
 ## Что взять из прототипа (папка `/workspace`)
 
+Клиент живёт в `frontend/`. Браузерный Gemini и regex-процессор удалены (этап 3C).
+
 | Что | Откуда | Действие |
 |---|---|---|
-| UI компоненты | `components/*.tsx` | Переработать, подключить к API |
-| D&D константы | `constants.ts` | Портировать в Python |
-| Идеи system prompt | `services/geminiService.ts` | Переработать под structured output |
-| Типы как референс | `types.ts` | При написании Pydantic моделей |
-| `App.tsx` | — | Выбросить (god component) |
-| `utils/commandProcessor.ts` | — | Выбросить (regex → structured output) |
+| UI компоненты | `frontend/src/components/*.tsx` | Подключены к session API |
+| D&D константы | `frontend/src/constants.ts` | Портировать в Python (после 3C) |
+| Идеи system prompt | `services/geminiService.ts` | Файл удалён; идеи в `prompts.py` |
+| Типы как референс | `frontend/src/types.ts` | Форма создания; игровой стейт — `frontend/src/api/types.ts` |
+| `App.tsx` | `frontend/src/App.tsx` | Session-driven оркестратор экранов, не игровой движок |
+| `utils/commandProcessor.ts` | — | Удалён (regex → structured output) |
 
 ---
 
