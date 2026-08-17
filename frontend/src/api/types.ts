@@ -70,6 +70,8 @@ export interface Character {
     conditions: string[];
     death_saves: DeathSaves;
     quests: Quest[];
+    hit_dice_current: number | null;
+    hit_dice_max: number | null;
 }
 
 export interface Combatant {
@@ -114,7 +116,7 @@ export interface GameSession {
 }
 
 export interface RollRequest {
-    type: 'ABILITY_CHECK' | 'SAVING_THROW' | 'ATTACK_ROLL';
+    type: 'ABILITY_CHECK' | 'SAVING_THROW' | 'ATTACK_ROLL' | 'DEATH_SAVE';
     ability: string;
     dc: number;
     reason: string;

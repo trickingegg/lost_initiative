@@ -15,7 +15,7 @@ interface GameScreenProps {
     canRetry: boolean;
     onSendMessage: (message: string) => void;
     onRoll: (total: number, natural: number) => void;
-    onRest: (kind: 'short' | 'long') => void;
+    onRest: (kind: 'short' | 'long', hitDiceSpent?: number) => void;
     onSave: (slot: number) => void;
     onLoad: (slot: number) => void;
     onRetry: () => void;
@@ -38,12 +38,28 @@ const GameScreen: React.FC<GameScreenProps> = ({
     const [slot, setSlot] = useState(1);
     const [confirmSlot, setConfirmSlot] = useState<number | null>(null);
     const [sheetOpen, setSheetOpen] = useState(false);
-    const awaitingRoll = lastGm?.state_changes.await_roll ?? null;
+    const [shortRestOpen, setShortRestOpen] = useState(false);
+    const hitDiceMax = session.character.hit_dice_max ?? session.character.level;
+    const hitDiceCurrent = session.character.hit_dice_current ?? hitDiceMax;
+    const [hitDiceToSpend, setHitDiceToSpend] = useState(Math.min(1, hitDiceCurrent));
+    const isDead = session.character.conditions.includes('dead');
+    const isStable = session.character.conditions.includes('stable');
+    const isDying = session.character.hp_current <= 0 && !isDead && !isStable;
+    const deathSaveRequest = {
+        type: 'DEATH_SAVE' as const,
+        ability: 'none',
+        dc: 10,
+        reason: 'You are dying. Roll a death saving throw (10 or higher succeeds).',
+    };
+    const awaitingRoll = isDying
+        ? deathSaveRequest
+        : (lastGm?.state_changes.await_roll ?? null);
     const occupied = saveSlots.find((item) => item.slot === slot);
+    const canAct = !isLoading && !awaitingRoll && !isDead && !isDying && !isStable;
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        if (input.trim() && !isLoading && !awaitingRoll) {
+        if (input.trim() && canAct) {
             onSendMessage(input.trim());
             setInput('');
         }
@@ -98,15 +114,18 @@ const GameScreen: React.FC<GameScreenProps> = ({
                             Load
                         </button>
                         <button
-                            onClick={() => onRest('short')}
-                            disabled={isLoading || !!awaitingRoll}
+                            onClick={() => {
+                                setHitDiceToSpend(Math.min(1, hitDiceCurrent));
+                                setShortRestOpen((open) => !open);
+                            }}
+                            disabled={isLoading || !!awaitingRoll || isDead || isDying || !!session.battle_state}
                             className="bg-emerald-800 hover:bg-emerald-900 text-white text-sm font-bold py-2 px-3 rounded disabled:bg-gray-500"
                         >
                             Short Rest
                         </button>
                         <button
                             onClick={() => onRest('long')}
-                            disabled={isLoading || !!awaitingRoll}
+                            disabled={isLoading || !!awaitingRoll || isDead || isDying || !!session.battle_state}
                             className="bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-bold py-2 px-3 rounded disabled:bg-gray-500"
                         >
                             Long Rest
@@ -150,6 +169,53 @@ const GameScreen: React.FC<GameScreenProps> = ({
                         Slot {slot} already has {occupied.character_name} (turn {occupied.turn_count}). Click Confirm overwrite to replace it.
                     </div>
                 )}
+                {isDead && (
+                    <div className="mb-3 bg-red-950/70 border border-red-500 text-red-100 text-sm rounded px-3 py-2">
+                        You are dead. Load a save or return to the menu.
+                    </div>
+                )}
+                {isDying && (
+                    <div className="mb-3 bg-red-900/50 border border-red-500 text-red-100 text-sm rounded px-3 py-2">
+                        You are dying. Make a death saving throw.
+                    </div>
+                )}
+                {isStable && !isDead && (
+                    <div className="mb-3 bg-amber-900/40 border border-amber-500 text-amber-100 text-sm rounded px-3 py-2">
+                        You are stable but unconscious. You cannot act until you are healed.
+                    </div>
+                )}
+                {shortRestOpen && !session.battle_state && (
+                    <div className="mb-3 bg-emerald-950/50 border border-emerald-600 text-emerald-100 text-sm rounded px-3 py-2 flex flex-wrap items-center gap-2">
+                        <span>Spend hit dice ({hitDiceCurrent}/{hitDiceMax} remaining):</span>
+                        <input
+                            type="number"
+                            min={0}
+                            max={hitDiceCurrent}
+                            value={hitDiceToSpend}
+                            onChange={(e) => setHitDiceToSpend(Math.max(0, Math.min(hitDiceCurrent, Number(e.target.value) || 0)))}
+                            className="w-16 bg-gray-800 border border-gray-600 rounded px-2 py-1"
+                            aria-label="Hit dice to spend"
+                        />
+                        <button
+                            type="button"
+                            disabled={isLoading}
+                            onClick={() => {
+                                setShortRestOpen(false);
+                                onRest('short', hitDiceToSpend);
+                            }}
+                            className="bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-bold py-1 px-3 rounded"
+                        >
+                            Rest
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setShortRestOpen(false)}
+                            className="text-xs text-gray-300 underline"
+                        >
+                            Cancel
+                        </button>
+                    </div>
+                )}
                 {session.pending_level_up && (
                     <div className="mb-3 bg-yellow-900/40 border border-yellow-500 text-yellow-100 text-sm rounded px-3 py-2">
                         You reached level {session.pending_level_up.new_level}
@@ -174,7 +240,7 @@ const GameScreen: React.FC<GameScreenProps> = ({
                 <StoryLog chatHistory={session.chat_history} isThinking={isLoading} />
 
                 <div className="mt-4 flex-shrink-0">
-                    {awaitingRoll ? (
+                    {isDead || isStable ? null : awaitingRoll ? (
                         <DiceRollPrompt
                             character={session.character}
                             awaitingRoll={awaitingRoll}
@@ -190,11 +256,11 @@ const GameScreen: React.FC<GameScreenProps> = ({
                                     onChange={(e) => setInput(e.target.value)}
                                     placeholder="What do you do?"
                                     className="flex-grow bg-gray-700 border border-gray-600 rounded-l-md shadow-sm py-2 px-4 focus:outline-none focus:ring-yellow-500 focus:border-yellow-500"
-                                    disabled={isLoading}
+                                    disabled={!canAct}
                                 />
                                 <button
                                     type="submit"
-                                    disabled={isLoading}
+                                    disabled={!canAct}
                                     className="bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-bold py-2 px-4 rounded-r-md transition duration-200 disabled:bg-gray-500 disabled:cursor-not-allowed h-[42px] w-[80px] flex items-center justify-center"
                                 >
                                     {isLoading ? (
@@ -210,7 +276,7 @@ const GameScreen: React.FC<GameScreenProps> = ({
                                         <button
                                             key={action}
                                             type="button"
-                                            disabled={isLoading}
+                                            disabled={!canAct}
                                             onClick={() => onSendMessage(action)}
                                             className="text-xs bg-gray-700 hover:bg-gray-600 text-gray-200 px-3 py-1 rounded-full disabled:opacity-50"
                                         >

@@ -142,9 +142,18 @@ class EngineCharacter:
     ki_max: Optional[int] = None
     conditions: Tuple[str, ...] = field(default_factory=tuple)
     death_saves: Dict[str, int] = field(default_factory=lambda: {"successes": 0, "failures": 0})
+    hit_dice_current: Optional[int] = None
+    hit_dice_max: Optional[int] = None
 
     def with_changes(self, **kwargs) -> "EngineCharacter":
         return replace(self, **kwargs)
+
+
+def hit_dice_pool(character: EngineCharacter) -> Tuple[int, int]:
+    """Remaining and maximum hit dice. Missing values default to character level."""
+    maximum = character.hit_dice_max if character.hit_dice_max is not None else character.level
+    current = character.hit_dice_current if character.hit_dice_current is not None else maximum
+    return max(0, current), max(0, maximum)
 
 
 @dataclass(frozen=True)
@@ -238,18 +247,29 @@ def apply_long_rest(character: EngineCharacter) -> EngineCharacter:
     """
     Long rest: restore full HP, all spell slots, all Ki points.
     Death saves reset on any rest after stabilization (handled here too).
+    Dead characters are unchanged.
     """
+    if "dead" in character.conditions:
+        return character
     # Restore spell slots
     restored_slots: Dict[int, SpellSlot] = {
         lvl: SpellSlot(current=slot.maximum, maximum=slot.maximum)
         for lvl, slot in character.spell_slots.items()
     }
 
+    hd_current, hd_max = hit_dice_pool(character)
+    recovered = max(1, hd_max // 2)
+    new_hit_dice = min(hd_max, hd_current + recovered)
+    waking = tuple(c for c in character.conditions if c not in ("unconscious", "stable"))
+
     return character.with_changes(
         hp_current=character.hp_max,
         spell_slots=restored_slots,
         ki_current=character.ki_max if character.ki_max is not None else None,
         death_saves={"successes": 0, "failures": 0},
+        hit_dice_current=new_hit_dice,
+        hit_dice_max=hd_max,
+        conditions=waking,
     )
 
 
@@ -261,6 +281,10 @@ def apply_short_rest(character: EngineCharacter, hit_dice_spent: int) -> EngineC
     if hit_dice_spent < 0:
         raise ValueError("hit_dice_spent cannot be negative")
 
+    hd_current, hd_max = hit_dice_pool(character)
+    if hit_dice_spent > hd_current:
+        raise ValueError("Not enough hit dice remaining")
+
     hit_die = HIT_DIE_BY_CLASS.get(character.char_class.lower(), 8)
     con_mod = calculate_modifier(character.abilities.constitution)
 
@@ -270,7 +294,11 @@ def apply_short_rest(character: EngineCharacter, hit_dice_spent: int) -> EngineC
         total_heal += max(1, _random.randint(1, hit_die) + con_mod)
 
     new_hp = min(character.hp_max, character.hp_current + total_heal)
-    return character.with_changes(hp_current=new_hp)
+    return character.with_changes(
+        hp_current=new_hp,
+        hit_dice_current=hd_current - hit_dice_spent,
+        hit_dice_max=hd_max,
+    )
 
 
 def level_up(character: EngineCharacter) -> Tuple[EngineCharacter, LevelUpChoices]:
@@ -294,11 +322,14 @@ def level_up(character: EngineCharacter) -> Tuple[EngineCharacter, LevelUpChoice
         new_features=[],
     )
 
+    hd_current, hd_max = hit_dice_pool(character)
     updated = character.with_changes(
         level=new_level,
         proficiency_bonus=new_prof_bonus,
         hp_max=character.hp_max + hp_increase,
         hp_current=character.hp_current + hp_increase,
+        hit_dice_max=hd_max + 1,
+        hit_dice_current=hd_current + 1,
     )
     return updated, choices
 

@@ -32,7 +32,14 @@ from app.models.domain import (
     StateChanges,
 )
 from app.services.combat_flow import continue_combat
-from app.services.session_service import apply_state_changes, _to_engine_char, _from_engine_char
+from app.services.session_service import (
+    apply_death_save,
+    apply_state_changes,
+    is_dying_character,
+    with_death_save_prompt,
+    _from_engine_char,
+    _to_engine_char,
+)
 
 router = APIRouter(prefix="/session", tags=["session"])
 
@@ -49,6 +56,7 @@ async def _apply_gm_turn(
         "chat_history": list(original.chat_history) + extra_messages,
     })
     updated_session, gm_response = await continue_combat(updated_session, gm_response)
+    gm_response = with_death_save_prompt(updated_session, gm_response)
     await update_session(db, updated_session, gm_response)
     return ActionResponse(session=updated_session, gm_response=gm_response)
 
@@ -129,8 +137,14 @@ async def submit_roll(
 
     from app.ai_gm.gm_service import process_roll_result
 
+    extra = []
+    if is_dying_character(session.character):
+        natural = request.natural if request.natural is not None else request.roll
+        session, death_line = apply_death_save(session, natural)
+        extra.append(ChatMessage(role="system", content=death_line))
+
     gm_response, session_with_memory = await process_roll_result(session, request.roll)
-    extra = [ChatMessage(role="system", content=f"[Roll: {request.roll}]")]
+    extra.append(ChatMessage(role="system", content=f"[Roll: {request.roll}]"))
     if request.natural == 20:
         extra.append(ChatMessage(role="system", content="[Natural 20]"))
     elif request.natural == 1:
@@ -149,10 +163,28 @@ async def take_rest(
     if session is None:
         raise HTTPException(status_code=404, detail="Session not found")
 
+    if "dead" in session.character.conditions:
+        raise HTTPException(status_code=400, detail="You are dead.")
+    if session.battle_state is not None:
+        raise HTTPException(status_code=400, detail="Cannot rest during combat.")
+    if is_dying_character(session.character):
+        raise HTTPException(status_code=400, detail="You cannot rest while dying.")
+
     if request.type == "long":
         changes = StateChanges(long_rest=True)
         narrative = "You take a long rest. The world is quiet for a few hours, and you awaken refreshed."
     else:
+        from app.game_engine.character import hit_dice_pool
+
+        if session.character.hp_current <= 0:
+            raise HTTPException(status_code=400, detail="You cannot spend hit dice at 0 HP.")
+        ec = _to_engine_char(session.character)
+        remaining, _maximum = hit_dice_pool(ec)
+        if request.hit_dice_spent > remaining:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Not enough hit dice remaining ({remaining} left).",
+            )
         changes = StateChanges(short_rest=True)
         narrative = f"You take a short rest, spending {request.hit_dice_spent} hit dice to recover."
 

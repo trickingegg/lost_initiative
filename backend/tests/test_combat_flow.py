@@ -67,6 +67,11 @@ class TestAdvanceTurn:
         nxt = advance_battle_turn(battle)
         assert current_combatant(nxt).id == "player"
 
+    def test_does_not_skip_dying_player(self):
+        battle = _battle(["goblin", "player"], current=0, hp_by_id={"player": 0})
+        nxt = advance_battle_turn(battle)
+        assert current_combatant(nxt).id == "player"
+
 
 class TestContinueCombat:
     @pytest.mark.asyncio
@@ -135,6 +140,23 @@ class TestContinueCombat:
             await continue_combat(session, gm)
 
         assert mocked.await_count == MAX_NPC_TURNS_PER_REQUEST
+
+    @pytest.mark.asyncio
+    async def test_stops_when_player_is_dying(self):
+        session = make_session(battle_state=_battle(["goblin", "orc", "player"], current=0))
+        gm = GMResponse(narrative="You wait.", state_changes=StateChanges())
+        npc_gm = GMResponse(narrative="A critical hit.", state_changes=StateChanges(damage=18))
+
+        async def fake(sess, action):
+            return npc_gm, sess
+
+        with patch("app.ai_gm.gm_service.process_action", new=AsyncMock(side_effect=fake)) as mocked:
+            updated, last = await continue_combat(session, gm)
+
+        assert mocked.await_count == 1
+        assert updated.character.hp_current == 0
+        assert last.state_changes.await_roll is not None
+        assert last.state_changes.await_roll.type == "DEATH_SAVE"
 
     def test_player_helper(self):
         assert is_player_combatant(_combatant("player", "Aria", is_player=True))

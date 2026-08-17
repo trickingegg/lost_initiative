@@ -23,9 +23,11 @@ from app.models.domain import (
     CombatantDamage,
     DeathSaves,
     GameSession,
+    GMResponse,
     Item,
     PendingLevelUp,
     Quest,
+    RollRequest,
     SpellSlot,
     StateChanges,
 )
@@ -68,6 +70,8 @@ def _to_engine_char(c: Character) -> EngineCharacter:
         ki_max=c.ki_max,
         conditions=tuple(c.conditions),
         death_saves={"successes": c.death_saves.successes, "failures": c.death_saves.failures},
+        hit_dice_current=c.hit_dice_current,
+        hit_dice_max=c.hit_dice_max,
     )
 
 
@@ -84,6 +88,8 @@ def _from_engine_char(ec: EngineCharacter, original: Character) -> Character:
             successes=ec.death_saves.get("successes", 0),
             failures=ec.death_saves.get("failures", 0),
         ),
+        "hit_dice_current": ec.hit_dice_current,
+        "hit_dice_max": ec.hit_dice_max,
         "spell_slots": {
             lvl: SpellSlot(current=slot.current, maximum=slot.maximum)
             for lvl, slot in ec.spell_slots.items()
@@ -169,10 +175,9 @@ def apply_state_changes(session: GameSession, changes: StateChanges) -> GameSess
 
     # 1. Direct HP changes (player)
     if changes.damage is not None and changes.damage > 0:
-        ec, _is_dead = combat_engine.apply_damage(ec, changes.damage)
+        ec, _is_dead = combat_engine.apply_damage(ec, changes.damage, is_player=True)
     if changes.heal is not None and changes.heal > 0:
-        new_hp = min(ec.hp_max, ec.hp_current + changes.heal)
-        ec = ec.with_changes(hp_current=new_hp)
+        ec = combat_engine.apply_heal(ec, changes.heal)
 
     # 2. XP + mechanical level-up (HP / proficiency). Subclass choices stay pending.
     if changes.add_xp is not None and changes.add_xp > 0:
@@ -316,3 +321,60 @@ def apply_state_changes(session: GameSession, changes: StateChanges) -> GameSess
         "pending_level_up": pending_level_up,
         "gm_internal_notes": notes,
     })
+
+
+DEATH_SAVE_REQUEST = RollRequest(
+    type="DEATH_SAVE",
+    ability="none",
+    dc=10,
+    reason="You are dying. Roll a death saving throw (10 or higher succeeds).",
+)
+
+
+def is_dying_character(character: Character) -> bool:
+    if character.hp_current > 0:
+        return False
+    if "dead" in character.conditions or "stable" in character.conditions:
+        return False
+    return True
+
+
+def with_death_save_prompt(session: GameSession, gm_response: GMResponse) -> GMResponse:
+    """If the player is dying, the next input must be a death save — not a skill check."""
+    if not is_dying_character(session.character):
+        return gm_response
+    changes = gm_response.state_changes.model_copy(update={"await_roll": DEATH_SAVE_REQUEST})
+    return gm_response.model_copy(update={"state_changes": changes})
+
+
+def apply_death_save(session: GameSession, natural: int) -> tuple[GameSession, str]:
+    """Apply a d20 death save. Returns (session, system-line describing the engine result)."""
+    before = session.character
+    ec = combat_engine.check_death_saves(_to_engine_char(before), natural)
+    char = _from_engine_char(ec, before)
+    battle_state = session.battle_state
+    if battle_state is not None:
+        battle_state = _sync_player_combatant(battle_state, char)
+    updated = session.model_copy(update={"character": char, "battle_state": battle_state})
+    return updated, _death_save_summary(before, char, natural)
+
+
+def _death_save_summary(before: Character, after: Character, roll: int) -> str:
+    if after.hp_current > 0:
+        return f"[Death save: {roll} — natural 20. You regain 1 HP.]"
+    if "dead" in after.conditions and "dead" not in before.conditions:
+        return f"[Death save: {roll} — you die.]"
+    if "stable" in after.conditions and "stable" not in before.conditions:
+        return (
+            f"[Death save: {roll} — stable "
+            f"({after.death_saves.successes}/3 successes).]"
+        )
+    if after.death_saves.successes > before.death_saves.successes:
+        return (
+            f"[Death save: {roll} — success "
+            f"({after.death_saves.successes}/3).]"
+        )
+    return (
+        f"[Death save: {roll} — failure "
+        f"({after.death_saves.failures}/3).]"
+    )

@@ -47,6 +47,7 @@ const DiceRollPrompt: React.FC<DiceRollPromptProps> = ({ character, awaitingRoll
         }, 100);
     };
 
+    const isDeathSave = awaitingRoll.type === 'DEATH_SAVE';
     const typeText = awaitingRoll.type.replace(/_/g, ' ').toLowerCase();
     const critClass = result?.total !== null && result.d20 === 20
         ? 'text-green-400'
@@ -58,15 +59,25 @@ const DiceRollPrompt: React.FC<DiceRollPromptProps> = ({ character, awaitingRoll
 
     return (
         <div className="w-full bg-gray-700 border border-yellow-500/50 rounded-lg p-4 text-center flex flex-col items-center shadow-lg">
-            <h3 className="text-lg font-semibold text-yellow-400">Action Required</h3>
-            <p className="text-gray-300 mb-1">
-                Make a <span className="font-bold">{awaitingRoll.ability} {typeText}</span>. (Difficulty: {awaitingRoll.dc})
-            </p>
-            <p className="text-xs text-gray-400 mb-2">
-                Modifier {breakdown.abilityMod >= 0 ? '+' : ''}{breakdown.abilityMod}
-                {breakdown.proficiency > 0 ? ` + proficiency ${breakdown.proficiency}` : ''}
-                {breakdown.skillName ? ` (${breakdown.skillName})` : ''}
-            </p>
+            <h3 className="text-lg font-semibold text-yellow-400">
+                {isDeathSave ? 'Death Saving Throw' : 'Action Required'}
+            </h3>
+            {isDeathSave ? (
+                <p className="text-gray-300 mb-1">
+                    Roll a d20. <span className="font-bold">10 or higher</span> succeeds.
+                </p>
+            ) : (
+                <>
+                    <p className="text-gray-300 mb-1">
+                        Make a <span className="font-bold">{awaitingRoll.ability} {typeText}</span>. (Difficulty: {awaitingRoll.dc})
+                    </p>
+                    <p className="text-xs text-gray-400 mb-2">
+                        Modifier {breakdown.abilityMod >= 0 ? '+' : ''}{breakdown.abilityMod}
+                        {breakdown.proficiency > 0 ? ` + proficiency ${breakdown.proficiency}` : ''}
+                        {breakdown.skillName ? ` (${breakdown.skillName})` : ''}
+                    </p>
+                </>
+            )}
             {awaitingRoll.reason && (
                 <p className="text-sm text-gray-400 mb-4">{awaitingRoll.reason}</p>
             )}
@@ -74,13 +85,19 @@ const DiceRollPrompt: React.FC<DiceRollPromptProps> = ({ character, awaitingRoll
             <div className="h-20 flex items-center justify-center">
                 {result && (
                     <div className="text-2xl font-mono">
-                        <span className="text-white bg-gray-800 px-2 py-1 rounded">{result.d20}</span>
-                        <span className="mx-2 text-yellow-400">{breakdown.total >= 0 ? '+' : '-'}</span>
-                        <span className="text-white bg-gray-800 px-2 py-1 rounded">{Math.abs(breakdown.total)}</span>
-                        {result.total !== null && (
+                        {isDeathSave ? (
+                            <span className={`text-3xl font-bold ${critClass}`}>{result.d20}</span>
+                        ) : (
                             <>
-                                <span className="mx-2 text-yellow-400">=</span>
-                                <span className={`text-3xl font-bold ${critClass}`}>{result.total}</span>
+                                <span className="text-white bg-gray-800 px-2 py-1 rounded">{result.d20}</span>
+                                <span className="mx-2 text-yellow-400">{breakdown.total >= 0 ? '+' : '-'}</span>
+                                <span className="text-white bg-gray-800 px-2 py-1 rounded">{Math.abs(breakdown.total)}</span>
+                                {result.total !== null && (
+                                    <>
+                                        <span className="mx-2 text-yellow-400">=</span>
+                                        <span className={`text-3xl font-bold ${critClass}`}>{result.total}</span>
+                                    </>
+                                )}
                             </>
                         )}
                     </div>

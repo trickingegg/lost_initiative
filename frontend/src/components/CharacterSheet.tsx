@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import type { Character, SpellSlot } from '../api/types';
+import { getConditionDescriptions } from '../api/client';
 import { calculateModifier } from '../utils/dnd';
 import { XP_THRESHOLDS } from '../constants';
 import HealthBar from './HealthBar';
@@ -20,8 +21,50 @@ const ABILITY_ORDER: { key: keyof Character['abilities']; label: string }[] = [
     { key: 'charisma', label: 'CHA' },
 ];
 
+const CONDITION_CHIP: Record<string, string> = {
+    dead: 'bg-red-900/80 text-red-100 border-red-500',
+    unconscious: 'bg-orange-900/70 text-orange-100 border-orange-500',
+    stable: 'bg-amber-900/70 text-amber-100 border-amber-500',
+};
+
+function Marks({ filled, fillClass, emptyClass, label }: {
+    filled: number;
+    fillClass: string;
+    emptyClass: string;
+    label: string;
+}) {
+    return (
+        <div className="flex items-center gap-1" aria-label={label}>
+            <span className="text-[10px] uppercase tracking-wide text-gray-500 w-12">{label}</span>
+            {[0, 1, 2].map((index) => (
+                <span
+                    key={index}
+                    className={`inline-block h-3 w-3 rounded-full border ${index < filled ? fillClass : emptyClass}`}
+                />
+            ))}
+        </div>
+    );
+}
+
 const CharacterSheet: React.FC<CharacterSheetProps> = ({ character }) => {
     const [activeTab, setActiveTab] = useState<Tab>('Inventory');
+    const [conditionHelp, setConditionHelp] = useState<Record<string, string>>({});
+
+    useEffect(() => {
+        let cancelled = false;
+        getConditionDescriptions()
+            .then((descriptions) => {
+                if (!cancelled) {
+                    setConditionHelp(descriptions);
+                }
+            })
+            .catch(() => {
+                /* sheet still works with condition names only */
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, []);
 
     const xpForNextLevel = character.level < XP_THRESHOLDS.length
         ? XP_THRESHOLDS[character.level]
@@ -40,11 +83,37 @@ const CharacterSheet: React.FC<CharacterSheetProps> = ({ character }) => {
                 <p className="text-gray-400">{`Level ${character.level} ${character.race} ${classLabel}`}</p>
                 <p className="text-sm text-gray-500">XP: {character.xp} / {xpForNextLevel}</p>
                 {character.conditions.length > 0 && (
-                    <p className="text-xs text-amber-400 mt-1">Conditions: {character.conditions.join(', ')}</p>
+                    <div className="flex flex-wrap gap-1 mt-2">
+                        {character.conditions.map((condition) => (
+                            <span
+                                key={condition}
+                                title={conditionHelp[condition] || condition}
+                                className={`text-[11px] px-2 py-0.5 rounded-full border capitalize ${CONDITION_CHIP[condition] || 'bg-gray-800 text-amber-200 border-amber-700'}`}
+                            >
+                                {condition}
+                            </span>
+                        ))}
+                    </div>
                 )}
-                {character.hp_current <= 0 && (
-                    <p className="text-xs text-red-300 mt-1">
-                        Death saves: {character.death_saves.successes} success / {character.death_saves.failures} failure
+                {(character.hp_current <= 0 || character.death_saves.successes > 0 || character.death_saves.failures > 0) && (
+                    <div className="mt-2 space-y-1">
+                        <Marks
+                            filled={character.death_saves.successes}
+                            fillClass="bg-green-400 border-green-300"
+                            emptyClass="bg-gray-800 border-gray-600"
+                            label="Success"
+                        />
+                        <Marks
+                            filled={character.death_saves.failures}
+                            fillClass="bg-red-500 border-red-400"
+                            emptyClass="bg-gray-800 border-gray-600"
+                            label="Failure"
+                        />
+                    </div>
+                )}
+                {(character.hit_dice_max ?? character.level) > 0 && (
+                    <p className="text-xs text-gray-500 mt-2">
+                        Hit dice: {character.hit_dice_current ?? character.level} / {character.hit_dice_max ?? character.level}
                     </p>
                 )}
             </div>

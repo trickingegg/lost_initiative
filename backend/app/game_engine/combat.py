@@ -177,28 +177,99 @@ def _roll_critical_damage(damage_dice: str) -> int:
 # Damage application
 # ---------------------------------------------------------------------------
 
-def apply_damage(
-    target: EngineCharacter,
-    damage: int,
-    damage_type: str = "slashing",
-) -> Tuple[EngineCharacter, bool]:
-    """
-    Apply damage to a character. Returns (updated_character, is_dead).
-    Dead = HP <= 0 AND character has no death save tracking started
-          (enemies die immediately; players enter death save state at 0 HP).
-    """
-    new_hp = max(0, target.hp_current - damage)
-    is_dead = new_hp <= 0 and not target.is_player_character()
-    updated = target.with_changes(hp_current=new_hp)
-    return updated, is_dead
-
-
 def _is_player_character(char: EngineCharacter) -> bool:
     return char.id == "player"
 
 
 # Monkey-patch helper onto EngineCharacter for is_dead check
 EngineCharacter.is_player_character = lambda self: self.id == "player"
+
+
+def is_dying(character: EngineCharacter) -> bool:
+    """True when the character is at 0 HP and still making death saves."""
+    if character.hp_current > 0:
+        return False
+    if "dead" in character.conditions or "stable" in character.conditions:
+        return False
+    return True
+
+
+def apply_damage(
+    target: EngineCharacter,
+    damage: int,
+    damage_type: str = "slashing",
+    is_player: Optional[bool] = None,
+) -> Tuple[EngineCharacter, bool]:
+    """
+    Apply damage to a character. Returns (updated_character, is_dead).
+
+    Enemies die at 0 HP. Players drop to 0, gain unconscious, and start death saves.
+    Leftover damage >= hp_max is massive damage (instant death). Damage while already
+    at 0 HP adds one death-save failure (or instant death if massive).
+    """
+    if damage <= 0:
+        return target, "dead" in target.conditions
+
+    player = target.is_player_character() if is_player is None else is_player
+    was_at_zero = target.hp_current <= 0
+    leftover = damage - target.hp_current
+    new_hp = max(0, target.hp_current - damage)
+
+    if not player:
+        return target.with_changes(hp_current=new_hp), new_hp <= 0
+
+    if new_hp > 0:
+        return target.with_changes(hp_current=new_hp), False
+
+    conditions = [c for c in target.conditions if c != "stable"]
+    saves = dict(target.death_saves)
+    massive = leftover >= target.hp_max and target.hp_max > 0
+
+    if massive:
+        if "dead" not in conditions:
+            conditions.append("dead")
+        if "unconscious" not in conditions:
+            conditions.append("unconscious")
+        return target.with_changes(
+            hp_current=0,
+            conditions=tuple(conditions),
+        ), True
+
+    if was_at_zero:
+        saves["failures"] = min(3, saves.get("failures", 0) + 1)
+        if saves["failures"] >= 3 and "dead" not in conditions:
+            conditions.append("dead")
+        if "unconscious" not in conditions:
+            conditions.append("unconscious")
+        return target.with_changes(
+            hp_current=0,
+            conditions=tuple(conditions),
+            death_saves=saves,
+        ), "dead" in conditions
+
+    if "unconscious" not in conditions:
+        conditions.append("unconscious")
+    return target.with_changes(
+        hp_current=0,
+        conditions=tuple(conditions),
+        death_saves=saves,
+    ), False
+
+
+def apply_heal(character: EngineCharacter, amount: int) -> EngineCharacter:
+    """Heal HP. Dead characters are unchanged. Healing above 0 wakes the character."""
+    if amount <= 0 or "dead" in character.conditions:
+        return character
+    new_hp = min(character.hp_max, character.hp_current + amount)
+    if new_hp <= 0:
+        return character.with_changes(hp_current=new_hp)
+    return character.with_changes(
+        hp_current=new_hp,
+        death_saves={"successes": 0, "failures": 0},
+        conditions=tuple(
+            c for c in character.conditions if c not in ("unconscious", "stable")
+        ),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -208,9 +279,12 @@ EngineCharacter.is_player_character = lambda self: self.id == "player"
 def check_death_saves(character: EngineCharacter, roll: int) -> EngineCharacter:
     """
     Process a death saving throw roll.
-    20 = stabilize (1 HP). 10-19 = success. 1-9 = failure. 1 = two failures.
+    20 = regain 1 HP. 10-19 = success. 1-9 = failure. 1 = two failures.
     3 successes = stable (unconscious at 0 HP). 3 failures = dead.
     """
+    if not is_dying(character):
+        return character
+
     saves = dict(character.death_saves)
 
     if roll == 20:
@@ -232,9 +306,10 @@ def check_death_saves(character: EngineCharacter, roll: int) -> EngineCharacter:
         if "dead" not in conditions:
             conditions.append("dead")
     elif saves.get("successes", 0) >= 3:
-        # Stable — still unconscious but no longer making saves
         if "stable" not in conditions:
             conditions.append("stable")
+        if "unconscious" not in conditions:
+            conditions.append("unconscious")
 
     return character.with_changes(
         death_saves=saves,

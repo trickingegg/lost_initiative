@@ -52,6 +52,8 @@ async def create_character(character: Character) -> Character:
         ),
         spell_slots={},
         death_saves={"successes": 0, "failures": 0},
+        hit_dice_current=character.level,
+        hit_dice_max=character.level,
     )
 
     computed_ac = calculate_ac(ec)
@@ -67,6 +69,8 @@ async def create_character(character: Character) -> Character:
         "proficiency_bonus": prof_bonus,
         "ac": computed_ac if character.ac == 0 else character.ac,
         "spell_slots": spell_slots,
+        "hit_dice_current": character.hit_dice_current if character.hit_dice_current is not None else character.level,
+        "hit_dice_max": character.hit_dice_max if character.hit_dice_max is not None else character.level,
     })
 
 
@@ -78,6 +82,13 @@ async def list_classes() -> List[str]:
 @router.get("/races", response_model=List[str])
 async def list_races() -> List[str]:
     return ["Human", "Elf", "Dwarf", "Halfling", "Half-Elf", "Tiefling"]
+
+
+@router.get("/conditions")
+async def list_conditions() -> Dict[str, str]:
+    from app.game_engine.conditions import CONDITION_DESCRIPTIONS
+
+    return dict(CONDITION_DESCRIPTIONS)
 
 
 @router.get("/ability-modifier/{score}", response_model=Dict[str, int])

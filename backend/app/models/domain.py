@@ -86,6 +86,8 @@ class Character(BaseModel):
     conditions: List[str] = Field(default_factory=list)
     death_saves: DeathSaves = Field(default_factory=DeathSaves)
     quests: List[Quest] = Field(default_factory=list)
+    hit_dice_current: Optional[int] = None
+    hit_dice_max: Optional[int] = None
 
 
 # ---------------------------------------------------------------------------
@@ -162,7 +164,7 @@ class GameSession(BaseModel):
 # ---------------------------------------------------------------------------
 
 class RollRequest(BaseModel):
-    type: Literal["ABILITY_CHECK", "SAVING_THROW", "ATTACK_ROLL"]
+    type: Literal["ABILITY_CHECK", "SAVING_THROW", "ATTACK_ROLL", "DEATH_SAVE"]
     ability: str
     dc: int
     reason: str
