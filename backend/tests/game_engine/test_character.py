@@ -172,6 +172,18 @@ class TestApplyLongRest:
         result = apply_long_rest(char)
         assert result.death_saves == {"successes": 0, "failures": 0}
 
+    def test_recovers_half_hit_dice(self):
+        char = make_character(level=4, hit_dice_current=0, hit_dice_max=4)
+        result = apply_long_rest(char)
+        assert result.hit_dice_current == 2
+
+    def test_clears_unconscious_when_hp_restored(self):
+        char = make_character(hp_current=0, conditions=("unconscious", "stable"))
+        result = apply_long_rest(char)
+        assert result.hp_current == 45
+        assert "unconscious" not in result.conditions
+        assert "stable" not in result.conditions
+
     def test_original_unchanged(self):
         char = make_character(hp_current=10)
         apply_long_rest(char)
@@ -195,6 +207,16 @@ class TestApplyShortRest:
         char = make_character(hp_current=20, hp_max=45)
         result = apply_short_rest(char, hit_dice_spent=0)
         assert result.hp_current == 20
+
+    def test_spending_more_than_remaining_raises(self):
+        char = make_character(level=2, hit_dice_current=1, hit_dice_max=2)
+        with pytest.raises(ValueError, match="Not enough hit dice"):
+            apply_short_rest(char, hit_dice_spent=2)
+
+    def test_decrements_hit_dice(self):
+        char = make_character(level=5, hit_dice_current=5, hit_dice_max=5, hp_current=10)
+        result = apply_short_rest(char, hit_dice_spent=2)
+        assert result.hit_dice_current == 3
 
     def test_negative_dice_raises(self):
         char = make_character()

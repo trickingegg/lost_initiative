@@ -311,6 +311,63 @@ class TestSessionLifecycle:
         assert "long rest" in history[-1]["content"].lower()
 
     @pytest.mark.asyncio
+    async def test_short_rest_spends_hit_dice(self, client: AsyncClient):
+        low_hp_char = {**CHARACTER_PAYLOAD, "hp_current": 5, "hit_dice_current": 3, "hit_dice_max": 3}
+        payload = {**SESSION_PAYLOAD, "character": low_hp_char}
+        create_resp = await client.post("/api/session/start", json=payload)
+        session_id = create_resp.json()["session"]["id"]
+
+        rest_resp = await client.post(
+            f"/api/session/{session_id}/rest",
+            json={"type": "short", "hit_dice_spent": 1},
+        )
+        assert rest_resp.status_code == 200
+        character = rest_resp.json()["session"]["character"]
+        assert character["hp_current"] > 5
+        assert character["hit_dice_current"] == 2
+
+    @pytest.mark.asyncio
+    async def test_rest_rejected_in_combat(self, client: AsyncClient):
+        create_resp = await client.post("/api/session/start", json=SESSION_PAYLOAD)
+        session_id = create_resp.json()["session"]["id"]
+        with _patch_action(_gm("Fight!", start_battle=[{"name": "Goblin", "hp": 7, "ac": 15}])):
+            await client.post(
+                f"/api/session/{session_id}/action",
+                json={"action": "I attack", "session_id": session_id},
+            )
+        rest_resp = await client.post(
+            f"/api/session/{session_id}/rest",
+            json={"type": "long"},
+        )
+        assert rest_resp.status_code == 400
+
+    @pytest.mark.asyncio
+    async def test_drop_to_zero_requests_death_save(self, client: AsyncClient):
+        create_resp = await client.post("/api/session/start", json=SESSION_PAYLOAD)
+        session_id = create_resp.json()["session"]["id"]
+        with _patch_action(_gm("A blow lands.", damage=18)):
+            action_resp = await client.post(
+                f"/api/session/{session_id}/action",
+                json={"action": "I stand there", "session_id": session_id},
+            )
+        data = action_resp.json()
+        assert data["session"]["character"]["hp_current"] == 0
+        assert "unconscious" in data["session"]["character"]["conditions"]
+        assert data["gm_response"]["state_changes"]["await_roll"]["type"] == "DEATH_SAVE"
+
+        with _patch_roll(_gm("You cling to life.")):
+            roll_resp = await client.post(
+                f"/api/session/{session_id}/roll",
+                json={"roll": 14, "session_id": session_id, "natural": 14},
+            )
+        roll_data = roll_resp.json()
+        assert roll_data["session"]["character"]["death_saves"]["successes"] == 1
+        system_lines = [
+            m["content"] for m in roll_data["session"]["chat_history"] if m["role"] == "system"
+        ]
+        assert any("Death save" in line for line in system_lines)
+
+    @pytest.mark.asyncio
     async def test_save_and_load_slot(self, client: AsyncClient):
         create_resp = await client.post("/api/session/start", json=SESSION_PAYLOAD)
         session_id = create_resp.json()["session"]["id"]
@@ -374,4 +431,16 @@ class TestCharacterEndpoints:
     async def test_create_character_computes_prof_bonus(self, client: AsyncClient):
         resp = await client.post("/api/character/create", json=CHARACTER_PAYLOAD)
         assert resp.status_code == 200
-        assert resp.json()["proficiency_bonus"] == 2  # level 3
+        body = resp.json()
+        assert body["proficiency_bonus"] == 2  # level 3
+        assert body["hit_dice_current"] == 3
+        assert body["hit_dice_max"] == 3
+
+    @pytest.mark.asyncio
+    async def test_list_conditions(self, client: AsyncClient):
+        resp = await client.get("/api/character/conditions")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert "unconscious" in body
+        assert "poisoned" in body
+        assert "dead" in body

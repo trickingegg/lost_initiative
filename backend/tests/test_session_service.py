@@ -14,7 +14,7 @@ from app.models.domain import (
     SpellSlot,
     StateChanges,
 )
-from app.services.session_service import apply_state_changes
+from app.services.session_service import apply_death_save, apply_state_changes, is_dying_character
 
 
 def make_character(**kwargs) -> Character:
@@ -119,6 +119,34 @@ class TestRestAndHp:
 
         healed = apply_state_changes(hurt, StateChanges(heal=100))
         assert healed.character.hp_current == 18
+
+
+class TestDeathSaves:
+    def test_dropping_to_zero_adds_unconscious(self):
+        session = make_session(character=make_character(hp_current=6))
+        updated = apply_state_changes(session, StateChanges(damage=10))
+        assert updated.character.hp_current == 0
+        assert "unconscious" in updated.character.conditions
+        assert is_dying_character(updated.character)
+
+    def test_heal_wakes_dying_character(self):
+        session = make_session(character=make_character(
+            hp_current=0,
+            conditions=["unconscious"],
+        ))
+        updated = apply_state_changes(session, StateChanges(heal=4))
+        assert updated.character.hp_current == 4
+        assert "unconscious" not in updated.character.conditions
+        assert not is_dying_character(updated.character)
+
+    def test_death_save_success_is_engine_resolved(self):
+        session = make_session(character=make_character(
+            hp_current=0,
+            conditions=["unconscious"],
+        ))
+        updated, line = apply_death_save(session, 14)
+        assert updated.character.death_saves.successes == 1
+        assert "success" in line.lower()
 
 
 class TestBattle:

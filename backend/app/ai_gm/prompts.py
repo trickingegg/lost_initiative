@@ -93,6 +93,7 @@ CORE RULES:
 - You do NOT calculate mechanics — the game engine does that and provides you the results.
 - When the engine reports a roll result or combat outcome, describe it dramatically.
 - Never invent dice rolls or decide outcomes yourself — always use await_roll to request them.
+- Death saving throws are resolved by the engine. If the player is dying, narrate the engine result; do not invent successes, failures, or HP.
 - If combat should start, use start_battle with enemy stats. Never invent HP/AC mid-combat.
 - Player HP: use damage / heal. Enemy HP: use combatant_damage with the id from BATTLE STATE. Do not put player damage in combatant_damage.
 

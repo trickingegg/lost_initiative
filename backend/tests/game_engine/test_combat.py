@@ -9,6 +9,7 @@ from app.game_engine.combat import (
     roll_initiative,
     resolve_attack,
     apply_damage,
+    apply_heal,
     check_death_saves,
     calculate_xp_reward,
 )
@@ -142,8 +143,23 @@ class TestApplyDamage:
 
     def test_player_does_not_die_at_zero_hp(self):
         player = make_char(char_id="player", hp=5)
-        _, is_dead = apply_damage(player, 10)
+        updated, is_dead = apply_damage(player, 10)
         assert is_dead is False  # player enters death save state
+        assert updated.hp_current == 0
+        assert "unconscious" in updated.conditions
+
+    def test_massive_damage_kills_player(self):
+        player = make_char(char_id="player", hp=5, hp_max=10)
+        updated, is_dead = apply_damage(player, 20)
+        assert is_dead is True
+        assert "dead" in updated.conditions
+
+    def test_damage_at_zero_adds_failure(self):
+        player = make_char(char_id="player", hp=0)
+        player = player.with_changes(conditions=("unconscious",))
+        updated, is_dead = apply_damage(player, 4)
+        assert is_dead is False
+        assert updated.death_saves["failures"] == 1
 
     def test_original_unchanged(self):
         char = make_char(hp=30)
@@ -151,19 +167,39 @@ class TestApplyDamage:
         assert char.hp_current == 30
 
 
+class TestApplyHeal:
+    def test_wakes_and_resets_death_saves(self):
+        char = make_char(hp=0)
+        char = char.with_changes(
+            conditions=("unconscious",),
+            death_saves={"successes": 2, "failures": 1},
+        )
+        updated = apply_heal(char, 5)
+        assert updated.hp_current == 5
+        assert "unconscious" not in updated.conditions
+        assert updated.death_saves == {"successes": 0, "failures": 0}
+
+    def test_does_not_heal_dead(self):
+        char = make_char(hp=0)
+        char = char.with_changes(conditions=("dead", "unconscious"))
+        updated = apply_heal(char, 10)
+        assert updated.hp_current == 0
+        assert "dead" in updated.conditions
+
+
 class TestCheckDeathSaves:
     def test_success_increments(self):
-        char = make_char()
+        char = make_char(hp=0)
         updated = check_death_saves(char, 15)
         assert updated.death_saves["successes"] == 1
 
     def test_failure_increments(self):
-        char = make_char()
+        char = make_char(hp=0)
         updated = check_death_saves(char, 5)
         assert updated.death_saves["failures"] == 1
 
     def test_natural_1_adds_two_failures(self):
-        char = make_char()
+        char = make_char(hp=0)
         updated = check_death_saves(char, 1)
         assert updated.death_saves["failures"] == 2
 
@@ -173,23 +209,29 @@ class TestCheckDeathSaves:
         assert updated.hp_current == 1
 
     def test_three_failures_adds_dead_condition(self):
-        char = make_char()
+        char = make_char(hp=0)
         char = check_death_saves(char, 1)   # +2 failures
         char = check_death_saves(char, 5)   # +1 failure -> 3
         assert "dead" in char.conditions
 
     def test_three_successes_adds_stable_condition(self):
-        char = make_char()
+        char = make_char(hp=0)
         char = check_death_saves(char, 15)
         char = check_death_saves(char, 15)
         char = check_death_saves(char, 15)
         assert "stable" in char.conditions
+        assert "unconscious" in char.conditions
 
     def test_saves_capped_at_3(self):
-        char = make_char()
-        char = char.with_changes(death_saves={"successes": 3, "failures": 3})
+        char = make_char(hp=0)
+        char = char.with_changes(death_saves={"successes": 3, "failures": 3}, conditions=("dead",))
         updated = check_death_saves(char, 1)
         assert updated.death_saves["failures"] <= 3
+
+    def test_ignored_when_not_dying(self):
+        char = make_char(hp=10)
+        updated = check_death_saves(char, 1)
+        assert updated.death_saves == {"successes": 0, "failures": 0}
 
 
 class TestCalculateXpReward:

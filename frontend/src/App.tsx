@@ -69,7 +69,7 @@ function isGmFailure(gm: GMResponse | null): boolean {
 type RetryPayload =
   | { kind: 'action'; text: string }
   | { kind: 'roll'; total: number; natural?: number }
-  | { kind: 'rest'; restKind: 'short' | 'long' };
+  | { kind: 'rest'; restKind: 'short' | 'long'; hitDiceSpent?: number };
 
 const App: React.FC = () => {
   const [currentScreen, setCurrentScreen] = useState<Screen>('menu');
@@ -228,16 +228,16 @@ const App: React.FC = () => {
     }
   };
 
-  const handleRest = async (kind: 'short' | 'long') => {
+  const handleRest = async (kind: 'short' | 'long', hitDiceSpent = 0) => {
     if (!session) {
       return;
     }
     setBusy(true);
     setError(null);
     setStatusMessage(null);
-    setRetryPayload({ kind: 'rest', restKind: kind });
+    setRetryPayload({ kind: 'rest', restKind: kind, hitDiceSpent });
     try {
-      const result = await postRest(session.id, kind);
+      const result = await postRest(session.id, kind, hitDiceSpent);
       applySession(result.session);
       setLastGm(result.gm_response);
     } catch (err) {
@@ -256,7 +256,7 @@ const App: React.FC = () => {
     } else if (retryPayload.kind === 'roll') {
       void handleRollComplete(retryPayload.total, retryPayload.natural);
     } else {
-      void handleRest(retryPayload.restKind);
+      void handleRest(retryPayload.restKind, retryPayload.hitDiceSpent);
     }
   };
 

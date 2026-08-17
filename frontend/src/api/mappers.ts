@@ -49,6 +49,9 @@ export function rollModifier(
     character: ApiCharacter,
     awaitingRoll: RollRequest,
 ): { abilityMod: number; proficiency: number; total: number; skillName: string | null } {
+    if (awaitingRoll.type === 'DEATH_SAVE') {
+        return { abilityMod: 0, proficiency: 0, total: 0, skillName: null };
+    }
     const raw = awaitingRoll.ability.trim().toLowerCase();
     const skillName = Object.keys(SKILL_ABILITY).find((skill) => skill === raw) || null;
     const abilityName = skillName ? SKILL_ABILITY[skillName] : (ABILITY_ALIASES[raw] || 'strength');
@@ -111,6 +114,8 @@ export function toApiCharacter(form: FormCharacter): Partial<ApiCharacter> {
         ki_max: form.ki?.max ?? null,
         conditions: [],
         death_saves: { successes: 0, failures: 0 },
+        hit_dice_current: form.level,
+        hit_dice_max: form.level,
         quests: form.quests.map((quest) => ({
             title: quest.title,
             description: quest.description,

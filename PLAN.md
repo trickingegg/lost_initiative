@@ -17,8 +17,8 @@
 
 - **Этап 3A закрыт** (2026-08-15, [PR #6](https://github.com/trickingegg/lost_initiative/pull/6) смержен). UI на FastAPI.
 - **Этап 3B закрыт** (2026-08-15, [PR #7](https://github.com/trickingegg/lost_initiative/pull/7) смержен, `5695a80`). Retry, typewriter, NPC-ход на сервере, слоты с датой, README. `pytest` 278.
-- **Этап 3C в [PR #8](https://github.com/trickingegg/lost_initiative/pull/8)**: клиент в `frontend/`, удалены браузерный Gemini и regex. Без Zustand, без порта `constants.ts`, Tailwind остаётся CDN. `tsc` ок, `pytest` 278, UI-меню не чёрный экран.
-- Этап 4 — после merge 3C.
+- **Этап 3C в [PR #8](https://github.com/trickingegg/lost_initiative/pull/8)** (ждёт merge): клиент в `frontend/`, выпил прототипа.
+- **Этап 4A в этом PR**: death saves считает движок, conditions чипами, short rest с выбором hit dice. `pytest` 296. Классы этапа 2 / AC / слоты 6–9 — не здесь.
 
 ---
 
@@ -64,8 +64,8 @@
 | 2.5 Backend hardening | баги, из-за которых игра врёт или не клеится с UI | **закрыт (2026-08-15, PR #5)** |
 | 3A. Играбельный контур | фронт ходит в FastAPI, один полный ход | **закрыт (PR #6)** |
 | 3B. Приятно играть | подсказки, броски, rest, сейвы, ошибки, стрим | **закрыт (PR #7)** |
-| 3C. Убрать прототип | выкинуть Gemini-в-браузере, regex, перенос `frontend/` | **в этом PR** |
-| 4. Полная механика | death saves UI, conditions, классы этапа 2, AC | **не начинать до merge 3C** |
+| 3C. Убрать прототип | выкинуть Gemini-в-браузере, regex, перенос `frontend/` | **PR #8, ждёт merge** |
+| 4. Полная механика | death saves UI, conditions, классы этапа 2, AC | **4A в этом PR** |
 | 5. Голос | STT/TTS | **не начинать до стабильного текста** |
 
 Отдельно (не этап архитектуры, но уже в работе):
@@ -234,7 +234,7 @@
 
 ---
 
-## Этап 3C — Убрать прототипную механику ← текущий этап
+## Этап 3C — Убрать прототипную механику
 
 Когда 3A+3B живут на API:
 
@@ -248,13 +248,13 @@
 
 ---
 
-## Этап 4 — Полная механика
+## Этап 4 — Полная механика ← текущий этап
 
-Не начинать, пока 3B не закрыт. Иначе снова разъедутся два клиента.
+Не начинать классы этапа 2, пока 3C не смержен и 4A не закрыт. Иначе снова разъедутся два клиента.
 
-- [ ] Death saves UI (движок уже есть)
-- [ ] Conditions: иконки/тултипы, не только строка
-- [ ] Short rest: выбор hit dice
+- [x] Death saves UI (движок уже есть) — 4A: 0 HP → unconscious, бросок считает `check_death_saves`, три метки success/fail, massive damage
+- [x] Conditions: иконки/тултипы, не только строка — 4A: чипы + описания с `GET /api/character/conditions`
+- [x] Short rest: выбор hit dice — 4A: пул `hit_dice_current/max`, picker в UI, rest запрещён в бою и при dying
 - [ ] Правильный AC по броне из инвентаря (функция есть, данные брони должны быть каноничными)
 - [ ] Spell slots 6–9, списки заклинаний не только Wizard/Necromancer
 - [ ] Классы этапа 2: Barbarian, Paladin, Ranger, Sorcerer, Warlock, Bard, Druid
@@ -333,4 +333,5 @@
 1. ~~Backend 2.5: XP/CORS/моки тестов~~ — закрыто, [PR #5](https://github.com/trickingegg/lost_initiative/pull/5).
 2. ~~Фронт 3A: HTTP-клиент + session-driven `App`~~ — смержен, [PR #6](https://github.com/trickingegg/lost_initiative/pull/6).
 3. ~~3B: retry, бой/NPC, слоты, typewriter, README~~ — смержен, [PR #7](https://github.com/trickingegg/lost_initiative/pull/7).
-4. **Сейчас: 3C** — [PR #8](https://github.com/trickingegg/lost_initiative/pull/8). Zustand / порт `constants.ts` / Tailwind PostCSS — не в этом PR.
+4. ~~3C: выпилить прототип, перенести `frontend/`~~ — [PR #8](https://github.com/trickingegg/lost_initiative/pull/8), ждёт merge.
+5. **Сейчас: 4A** — death saves / conditions / short rest hit dice (этот PR, зависит от #8).

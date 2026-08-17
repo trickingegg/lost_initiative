@@ -9,7 +9,7 @@ from __future__ import annotations
 from typing import Optional, Tuple
 
 from app.models.domain import BattleState, ChatMessage, Combatant, GameSession, GMResponse
-from app.services.session_service import apply_state_changes
+from app.services.session_service import apply_state_changes, with_death_save_prompt
 
 MAX_NPC_TURNS_PER_REQUEST = 4
 
@@ -40,7 +40,11 @@ def advance_battle_turn(battle: BattleState) -> BattleState:
     order = list(battle.turn_order)
     if not order:
         return battle
-    alive = {combatant.id for combatant in battle.combatants if combatant.hp_current > 0}
+    alive = {
+        combatant.id
+        for combatant in battle.combatants
+        if combatant.hp_current > 0 or is_player_combatant(combatant)
+    }
     if not alive:
         return battle
 
@@ -77,6 +81,8 @@ async def continue_combat(
         return session, gm_response
     if session.battle_state is None:
         return session, gm_response
+    if "dead" in session.character.conditions:
+        return session, gm_response
 
     started_now = bool(gm_response.state_changes.start_battle)
     if not started_now:
@@ -99,7 +105,7 @@ async def continue_combat(
         current = current_combatant(battle)
         if current is None:
             break
-        if current.hp_current <= 0:
+        if current.hp_current <= 0 and not is_player_combatant(current):
             session = session.model_copy(update={"battle_state": advance_battle_turn(battle)})
             continue
         if is_player_combatant(current):
@@ -114,8 +120,8 @@ async def continue_combat(
             ChatMessage(role="system", content=f"[Turn: {current.name}]"),
             ChatMessage(role="gm", content=npc_gm.narrative),
         )
-        last_gm = npc_gm
-        if session.battle_state is None or npc_gm.state_changes.await_roll:
+        last_gm = with_death_save_prompt(session, npc_gm)
+        if session.battle_state is None or last_gm.state_changes.await_roll:
             break
         session = session.model_copy(
             update={"battle_state": advance_battle_turn(session.battle_state)}

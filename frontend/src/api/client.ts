@@ -117,6 +117,10 @@ export async function postRoll(
     });
 }
 
+export async function getConditionDescriptions(): Promise<Record<string, string>> {
+    return request<Record<string, string>>('/api/character/conditions');
+}
+
 export async function postRest(
     sessionId: string,
     type: 'short' | 'long',
