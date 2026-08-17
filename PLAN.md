@@ -18,7 +18,7 @@
 - **Этап 3A закрыт** (2026-08-15, [PR #6](https://github.com/trickingegg/lost_initiative/pull/6) смержен). UI на FastAPI.
 - **Этап 3B закрыт** (2026-08-15, [PR #7](https://github.com/trickingegg/lost_initiative/pull/7) смержен, `5695a80`). Retry, typewriter, NPC-ход на сервере, слоты с датой, README. `pytest` 278.
 - **Этап 3C в [PR #8](https://github.com/trickingegg/lost_initiative/pull/8)** (ждёт merge): клиент в `frontend/`, выпил прототипа.
-- **Этап 4A в этом PR**: death saves считает движок, conditions чипами, short rest с выбором hit dice. `pytest` 296. Классы этапа 2 / AC / слоты 6–9 — не здесь.
+- **Этап 4A в [PR #9](https://github.com/trickingegg/lost_initiative/pull/9)**: death saves считает движок, conditions чипами, short rest с выбором hit dice. `pytest` 296. Классы этапа 2 / AC / слоты 6–9 — не здесь.
 
 ---
 
@@ -77,6 +77,7 @@
 | [#6](https://github.com/trickingegg/lost_initiative/pull/6) | этап 3A: UI на FastAPI session loop | **смержен в `main`** |
 | [#7](https://github.com/trickingegg/lost_initiative/pull/7) | этап 3B: бой, retry, слоты, README | **смержен в `main`** |
 | [#8](https://github.com/trickingegg/lost_initiative/pull/8) | этап 3C: `frontend/`, выпил прототипа | **открыт** |
+| [#9](https://github.com/trickingegg/lost_initiative/pull/9) | этап 4A: death saves, conditions, hit dice | **открыт** |
 
 ---
 
@@ -334,4 +335,4 @@
 2. ~~Фронт 3A: HTTP-клиент + session-driven `App`~~ — смержен, [PR #6](https://github.com/trickingegg/lost_initiative/pull/6).
 3. ~~3B: retry, бой/NPC, слоты, typewriter, README~~ — смержен, [PR #7](https://github.com/trickingegg/lost_initiative/pull/7).
 4. ~~3C: выпилить прототип, перенести `frontend/`~~ — [PR #8](https://github.com/trickingegg/lost_initiative/pull/8), ждёт merge.
-5. **Сейчас: 4A** — death saves / conditions / short rest hit dice (этот PR, зависит от #8).
+5. **Сейчас: 4A** — [PR #9](https://github.com/trickingegg/lost_initiative/pull/9), база — ветка 3C (#8).
